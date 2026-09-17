@@ -5,8 +5,7 @@ import {
   onSnapshot,
   updateDoc
 } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
-import { db, functions } from "./firebase.js";
+import { db } from "./firebase.js";
 
 export async function lerCardapioPublico(chave) {
   const snap = await getDoc(doc(db, "cardapio_publico", chave));
@@ -52,7 +51,12 @@ export function escutarPedidoPublico(pedidoId, onData, onError) {
 }
 
 export async function criarPedido(payload) {
-  const fn = httpsCallable(functions, "criarPedido");
-  const res = await fn(payload);
-  return res.data || {};
+  const resp = await fetch("/api/criar-pedido", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.error || "Falha ao enviar o pedido.");
+  return data;
 }

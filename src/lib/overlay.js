@@ -7,8 +7,26 @@ import {
   updateDoc,
   deleteDoc
 } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
-import { db, functions, CLOUDINARY_CLOUD, CLOUDINARY_PRESET } from "./firebase.js";
+import { auth, db, CLOUDINARY_CLOUD, CLOUDINARY_PRESET } from "./firebase.js";
+import { carregarBackupLoja, precoProduto, produtoAtivo } from "./backup.js";
+import { nomeDaLoja } from "./auth.js";
+
+async function apiLoja(path, chave, extra = {}) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Faça login na loja.");
+  const token = await user.getIdToken();
+  const resp = await fetch(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ chave, ...extra })
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.error || "Falha na API do cardápio.");
+  return data;
+}
 
 export async function lerConfig(chave) {
   const snap = await getDoc(doc(db, "cardapio_config", chave));
@@ -38,15 +56,43 @@ export async function salvarOverlay(chave, produtoId, patch) {
 }
 
 export async function publicarCardapio(chave) {
-  const fn = httpsCallable(functions, "publicarCardapio");
-  const res = await fn({ chave });
-  return res.data || {};
+  const [backup, overlays, config, licSnap] = await Promise.all([
+    carregarBackupLoja(chave),
+    listarOverlays(chave),
+    lerConfig(chave),
+    getDoc(doc(db, "licencas", chave))
+  ]);
+  const licenca = licSnap.exists() ? (licSnap.data() || {}) : {};
+  const publicados = [];
+  (backup.produtos || []).forEach((p) => {
+    if (!produtoAtivo(p) || !p.id) return;
+    const ov = overlays[p.id] || {};
+    if (!ov.visivel) return;
+    publicados.push({
+      id: String(p.id),
+      nome: String(p.nome || p.descricao || "").trim(),
+      preco: precoProduto(p),
+      categoria: String(p.categoria || "Geral"),
+      descricao: String(ov.descricao || "").slice(0, 400),
+      fotoUrl: String(ov.fotoUrl || ""),
+      esgotado: Boolean(ov.esgotado),
+      unidade: String(p.unidade || p.un || "UN")
+    });
+  });
+  await setDoc(doc(db, "cardapio_publico", chave), {
+    chave,
+    nome: nomeDaLoja(licenca),
+    logoUrl: String(licenca.logoUrl || ""),
+    pausado: Boolean(config.pausado),
+    taxaServico: Number(config.taxaServico) === 0 ? 0 : (Number(config.taxaServico) || 10),
+    produtos: publicados,
+    publicadoEm: new Date().toISOString()
+  });
+  return { ok: true, total: publicados.length };
 }
 
 export async function assinarUpload(chave, produtoId) {
-  const fn = httpsCallable(functions, "assinarUploadCloudinary");
-  const res = await fn({ chave, produtoId });
-  return res.data || {};
+  return apiLoja("/api/assinar-upload", chave, { produtoId });
 }
 
 export async function enviarFotoCloudinary(file, assinatura) {
@@ -69,8 +115,7 @@ export async function enviarFotoCloudinary(file, assinatura) {
 }
 
 export async function removerFoto(chave, produtoId, publicId) {
-  const fn = httpsCallable(functions, "removerFotoCloudinary");
-  const res = await fn({ chave, produtoId, publicId });
+  const res = await apiLoja("/api/remover-foto", chave, { publicId });
   await updateDoc(doc(db, "cardapio_config", chave, "produtos", String(produtoId)), {
     fotoUrl: "",
     fotoPublicId: "",
@@ -82,7 +127,7 @@ export async function removerFoto(chave, produtoId, publicId) {
       atualizadoEm: new Date().toISOString()
     }, { merge: true });
   });
-  return res.data || {};
+  return res;
 }
 
 export async function apagarOverlay(chave, produtoId) {
