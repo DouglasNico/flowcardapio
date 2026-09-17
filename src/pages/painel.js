@@ -13,7 +13,7 @@ import {
 } from "../lib/overlay.js";
 import { atualizarStatusPedido, escutarPedidosLoja, invalidarCardapioPublico } from "../lib/pedidos.js";
 import { brl, erroAmigavel, originPublico, esc, soDigitos, toast } from "../lib/format.js";
-import { textoExtras } from "../lib/grupos.js";
+import { sanitizarGrupos, textoExtras } from "../lib/grupos.js";
 import { abrirEditorGrupos } from "./painel-grupos.js";
 
 function beep() {
@@ -269,8 +269,8 @@ export async function renderPainel(app, sessao) {
       return;
     }
     lista.innerHTML = rows.map((p) => {
-      const ov = overlays[p.id] || {};
-      const nOp = (ov.grupos && ov.grupos.length) || 0;
+      const ov = overlays[p.id] || overlays[String(p.id)] || {};
+      const nOp = sanitizarGrupos(ov.grupos).length;
       const foto = ov.fotoUrl ? `<img class="thumb" src="${ov.fotoUrl}" alt="">` : `<div class="thumb">${esc((p.nome || "?").slice(0, 1))}</div>`;
       return `
         <article class="prod-card ${ov.visivel ? "on" : ""}" data-id="${p.id}">
@@ -300,6 +300,7 @@ export async function renderPainel(app, sessao) {
     lista.querySelectorAll(".prod-card").forEach((row) => {
       const id = row.dataset.id;
       const prod = produtos.find((p) => String(p.id) === String(id));
+      const ovAtual = () => overlays[id] || overlays[String(id)] || {};
       row.querySelector("[data-visivel]").addEventListener("change", (ev) => patchOverlay(id, { visivel: ev.target.checked }));
       row.querySelector("[data-destaque]").addEventListener("change", (ev) => patchOverlay(id, { destaque: ev.target.checked }));
       row.querySelector("[data-esgotado]").addEventListener("change", (ev) => patchOverlay(id, { esgotado: ev.target.checked }));
@@ -310,7 +311,7 @@ export async function renderPainel(app, sessao) {
       });
       const del = row.querySelector("[data-del-foto]");
       if (del) del.addEventListener("click", () => onRemoverFoto(id));
-      row.querySelector("[data-desc]").value = (overlays[id] && overlays[id].descricao) || "";
+      row.querySelector("[data-desc]").value = ovAtual().descricao || "";
       let t;
       row.querySelector("[data-desc]").addEventListener("input", (ev) => {
         const valor = ev.target.value;
@@ -321,11 +322,18 @@ export async function renderPainel(app, sessao) {
       row.querySelector("[data-opcoes]").addEventListener("click", () => {
         abrirEditorGrupos({
           produto: prod,
-          overlay: overlays[id] || {},
+          overlay: ovAtual(),
           produtos,
           onSave: async (grupos) => {
-            overlays[id] = { ...(overlays[id] || {}), grupos };
+            overlays[id] = { ...ovAtual(), grupos };
             await salvarOverlay(chave, id, { grupos });
+            invalidarCardapioPublico();
+            if (overlays[id].visivel) {
+              await publicarCardapio(chave);
+              toast("Opções no cardápio do cliente. Manda ele atualizar a página.");
+            } else {
+              toast("Opções salvas. Marca No cardápio e clica em Publicar.");
+            }
             pintarLista();
           }
         });

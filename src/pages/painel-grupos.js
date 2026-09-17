@@ -3,38 +3,79 @@ import { novoId, sanitizarGrupos } from "../lib/grupos.js";
 import { precoProduto } from "../lib/backup.js";
 
 const TEMPLATES = [
-  { nome: "Adicionais", tipo: "multi", min: 0, max: 6 },
-  { nome: "Molhos", tipo: "single", min: 0, max: 1 },
-  { nome: "Ponto da carne", tipo: "single", min: 1, max: 1 },
-  { nome: "Combo (batata e bebida)", tipo: "single", min: 0, max: 1 }
+  {
+    nome: "Adicionais",
+    tipo: "multi",
+    min: 0,
+    max: 6,
+    opcoes: [
+      { nome: "Bacon", preco: 4 },
+      { nome: "Cheddar", preco: 3 },
+      { nome: "Ovo", preco: 2 }
+    ]
+  },
+  {
+    nome: "Molhos",
+    tipo: "single",
+    min: 0,
+    max: 1,
+    opcoes: [
+      { nome: "Barbecue", preco: 0 },
+      { nome: "Maionese da casa", preco: 0 },
+      { nome: "Sem molho", preco: 0 }
+    ]
+  },
+  {
+    nome: "Ponto da carne",
+    tipo: "single",
+    min: 1,
+    max: 1,
+    opcoes: [
+      { nome: "Mal passada", preco: 0 },
+      { nome: "Ao ponto", preco: 0 },
+      { nome: "Bem passada", preco: 0 }
+    ]
+  },
+  {
+    nome: "Combo",
+    tipo: "single",
+    min: 0,
+    max: 1,
+    opcoes: [
+      { nome: "Batata + refrigerante", preco: 12 }
+    ]
+  }
 ];
 
-function grupoVazio(extra = {}) {
+function opcaoVazia(extra = {}) {
   return {
-    id: novoId("g"),
+    id: extra.id || novoId("o"),
+    nome: extra.nome || "",
+    descricao: extra.descricao || "",
+    preco: Number(extra.preco) || 0
+  };
+}
+
+function grupoVazio(extra = {}) {
+  const opcoes = Array.isArray(extra.opcoes) && extra.opcoes.length
+    ? extra.opcoes.map((o) => opcaoVazia(o))
+    : [opcaoVazia()];
+  return {
+    id: extra.id || novoId("g"),
     nome: extra.nome || "",
     tipo: extra.tipo || "multi",
     min: extra.min != null ? extra.min : 0,
     max: extra.max != null ? extra.max : 6,
-    opcoes: extra.opcoes || []
-  };
-}
-
-function opcaoVazia(extra = {}) {
-  return {
-    id: novoId("o"),
-    nome: extra.nome || "",
-    descricao: extra.descricao || "",
-    preco: extra.preco || 0
+    opcoes
   };
 }
 
 export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose }) {
   let grupos = JSON.parse(JSON.stringify((overlay && overlay.grupos) || []));
-  if (!grupos.length) grupos = [grupoVazio({ nome: "Adicionais" })];
+  if (!Array.isArray(grupos)) grupos = [];
 
   const wrap = document.createElement("div");
-  wrap.className = "sheet editor-sheet";
+  wrap.className = "modal";
   document.body.appendChild(wrap);
 
   function fechar() {
@@ -46,78 +87,77 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
     wrap.querySelectorAll(".ed-group").forEach((sec) => {
       const gi = Number(sec.dataset.gi);
       if (!grupos[gi]) return;
-      grupos[gi].nome = sec.querySelector("[data-nome]").value;
-      grupos[gi].tipo = sec.querySelector("[data-tipo]").value;
-      grupos[gi].min = Number(sec.querySelector("[data-min]").value) || 0;
-      grupos[gi].max = grupos[gi].tipo === "single" ? 1 : (Number(sec.querySelector("[data-max]").value) || 0);
+      const nomeEl = sec.querySelector("[data-nome]");
+      const tipoEl = sec.querySelector("[data-tipo]");
+      const obrEl = sec.querySelector("[data-obr]");
+      grupos[gi].nome = nomeEl ? nomeEl.value : grupos[gi].nome;
+      grupos[gi].tipo = tipoEl ? tipoEl.value : grupos[gi].tipo;
+      grupos[gi].min = obrEl && obrEl.checked ? 1 : 0;
+      grupos[gi].max = grupos[gi].tipo === "single" ? 1 : 6;
       grupos[gi].opcoes = [...sec.querySelectorAll(".ed-opt")].map((row) => ({
         id: (grupos[gi].opcoes && grupos[gi].opcoes[Number(row.dataset.oi)] && grupos[gi].opcoes[Number(row.dataset.oi)].id) || novoId("o"),
-        nome: row.querySelector("[data-onome]").value,
-        descricao: row.querySelector("[data-odesc]").value,
-        preco: Number(row.querySelector("[data-opreco]").value) || 0
+        nome: (row.querySelector("[data-onome]") || {}).value || "",
+        descricao: "",
+        preco: Number((row.querySelector("[data-opreco]") || {}).value) || 0
       }));
     });
   }
 
   function pintar() {
     wrap.innerHTML = `
-      <div class="sheet-card editor-card">
-        <div class="sheet-grab"></div>
+      <div class="modal-card" role="dialog" aria-labelledby="ed-titulo">
         <header class="editor-head">
           <div>
-            <h2>Opções do item</h2>
+            <h2 id="ed-titulo">Opções do item</h2>
             <p>${esc(produto.nome || "")}</p>
           </div>
           <button type="button" class="icon-btn" id="ed-fechar" aria-label="Fechar">✕</button>
         </header>
-        <p class="editor-help">O cliente vê isso ao tocar no lanche: adicionais, molho, ponto, combo. O preço na lista vira “A partir de”.</p>
+        <p class="editor-help">Isso aparece quando o cliente toca no lanche. Salvar já atualiza o cardápio público.</p>
         <div class="editor-templates">
           ${TEMPLATES.map((t, i) => `<button type="button" class="btn-ghost" data-tpl="${i}">+ ${esc(t.nome)}</button>`).join("")}
         </div>
         <div id="ed-grupos"></div>
-        <button type="button" class="btn-ghost" id="ed-add-g" style="width:100%;margin:8px 0">+ Novo grupo</button>
+        <button type="button" class="btn-ghost" id="ed-add-g">+ Grupo em branco</button>
         <div class="editor-actions">
           <button type="button" class="btn-ghost" id="ed-cancelar">Cancelar</button>
-          <button type="button" class="btn-primary" id="ed-salvar" style="width:auto">Salvar opções</button>
+          <button type="button" class="btn-primary" id="ed-salvar">Salvar no cardápio</button>
         </div>
       </div>
     `;
     const box = wrap.querySelector("#ed-grupos");
-    box.innerHTML = grupos.map((g, gi) => `
+    box.innerHTML = grupos.length ? grupos.map((g, gi) => `
       <section class="ed-group" data-gi="${gi}">
         <div class="ed-group-top">
-          <input data-nome placeholder="Nome do grupo (ex.: Adicionais)" value="${esc(g.nome)}">
+          <input data-nome placeholder="Nome do grupo" value="${esc(g.nome)}">
           <button type="button" class="btn-ghost" data-del-g>Remover</button>
         </div>
-        <div class="ed-grid">
-          <label>Tipo
+        <div class="ed-flags">
+          <label>Como escolhe
             <select data-tipo>
-              <option value="multi" ${g.tipo !== "single" ? "selected" : ""}>Várias opções</option>
-              <option value="single" ${g.tipo === "single" ? "selected" : ""}>Escolher 1</option>
+              <option value="multi" ${g.tipo !== "single" ? "selected" : ""}>Pode marcar várias</option>
+              <option value="single" ${g.tipo === "single" ? "selected" : ""}>Só uma</option>
             </select>
           </label>
-          <label>Mín.
-            <input type="number" min="0" max="20" data-min value="${g.min || 0}">
+          <label class="ed-check">
+            <input type="checkbox" data-obr ${g.min > 0 ? "checked" : ""}>
+            Obrigatório
           </label>
-          <label>Máx.
-            <input type="number" min="0" max="20" data-max value="${g.tipo === "single" ? 1 : (g.max || 6)}">
-          </label>
-        </div>
-        <div class="ed-import">
-          <button type="button" class="btn-ghost" data-imp="adicion">Puxar Adicionais do PDV</button>
-          <button type="button" class="btn-ghost" data-imp="bebida">Puxar Bebidas do PDV</button>
         </div>
         ${(g.opcoes || []).map((o, oi) => `
           <div class="ed-opt" data-oi="${oi}">
-            <input data-onome placeholder="Opção" value="${esc(o.nome || "")}">
-            <input data-odesc placeholder="Detalhe" value="${esc(o.descricao || "")}">
-            <input type="number" step="0.01" min="0" data-opreco placeholder="+ R$" value="${o.preco || 0}">
-            <button type="button" class="btn-ghost" data-del-o>✕</button>
+            <input data-onome placeholder="Nome da opção" value="${esc(o.nome || "")}">
+            <label class="ed-preco">R$ <input type="number" step="0.01" min="0" data-opreco value="${o.preco || 0}"></label>
+            <button type="button" class="icon-btn" data-del-o aria-label="Apagar opção">✕</button>
           </div>
         `).join("")}
-        <button type="button" class="btn-ghost" data-add-o>+ Opção</button>
+        <div class="ed-opt-actions">
+          <button type="button" class="btn-ghost" data-add-o>+ Opção</button>
+          <button type="button" class="btn-ghost" data-imp="adicion">Puxar Adicionais do PDV</button>
+          <button type="button" class="btn-ghost" data-imp="bebida">Puxar Bebidas do PDV</button>
+        </div>
       </section>
-    `).join("") || `<p class="empty">Nenhum grupo ainda.</p>`;
+    `).join("") : `<div class="empty-card"><h2>Nenhuma opção ainda</h2><p>Toca num modelo acima. Já vem bacon, molho ou ponto da carne prontos pra você só ajustar o preço.</p></div>`;
 
     wrap.querySelector("#ed-fechar").addEventListener("click", fechar);
     wrap.querySelector("#ed-cancelar").addEventListener("click", fechar);
@@ -136,14 +176,21 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
     wrap.querySelector("#ed-salvar").addEventListener("click", async () => {
       lerCampos();
       const limpos = sanitizarGrupos(grupos);
-      wrap.querySelector("#ed-salvar").disabled = true;
+      const digitou = grupos.some((g) => (g.opcoes || []).some((o) => String(o.nome || "").trim()));
+      if (!limpos.length && digitou) {
+        toast("Cada opção precisa de um nome.");
+        return;
+      }
+      const btnSalvar = wrap.querySelector("#ed-salvar");
+      btnSalvar.disabled = true;
+      btnSalvar.textContent = "Salvando...";
       try {
         await onSave(limpos);
-        toast(limpos.length ? "Opções salvas. Publique o cardápio para o cliente ver." : "Opções removidas.");
         fechar();
       } catch (err) {
         toast(String(err.message || err));
-        wrap.querySelector("#ed-salvar").disabled = false;
+        btnSalvar.disabled = false;
+        btnSalvar.textContent = "Salvar no cardápio";
       }
     });
 
@@ -184,11 +231,11 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
           pintar();
         });
       });
-      sec.querySelectorAll(".ed-opt").forEach((row) => {
-        const oi = Number(row.dataset.oi);
-        row.querySelector("[data-del-o]").addEventListener("click", () => {
+      sec.querySelectorAll("[data-del-o]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const row = btn.closest(".ed-opt");
           lerCampos();
-          grupos[gi].opcoes.splice(oi, 1);
+          grupos[gi].opcoes.splice(Number(row.dataset.oi), 1);
           pintar();
         });
       });

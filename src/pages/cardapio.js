@@ -296,6 +296,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
           <h3>${esc(p.nome)}</h3>
           ${p.descricao ? `<p>${esc(p.descricao)}</p>` : ""}
           <strong>${esc(rotuloPreco(p))}</strong>
+          ${sanitizarGrupos(p.grupos).length ? `<em class="opts-hint">Toque para escolher</em>` : ""}
         </div>
         <div class="menu-media">${foto}<span class="add-dot">${ico.plus}</span></div>
       </article>

@@ -65,7 +65,7 @@ export async function salvarConfig(chave, patch) {
 export async function listarOverlays(chave) {
   const snaps = await getDocs(collection(db, "cardapio_config", chave, "produtos"));
   const mapa = {};
-  snaps.forEach((s) => { mapa[s.id] = s.data() || {}; });
+  snaps.forEach((s) => { mapa[s.id] = mapa[String(s.id)] = s.data() || {}; });
   return mapa;
 }
 
@@ -88,7 +88,7 @@ export async function publicarCardapio(chave) {
   const publicados = [];
   (backup.produtos || []).forEach((p) => {
     if (!produtoAtivo(p) || !p.id) return;
-    const ov = overlays[p.id] || {};
+    const ov = overlays[p.id] || overlays[String(p.id)] || {};
     if (!ov.visivel) return;
     publicados.push({
       id: String(p.id),

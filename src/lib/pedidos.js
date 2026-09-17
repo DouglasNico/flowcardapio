@@ -10,7 +10,7 @@ import { db } from "./firebase.js";
 let cachePublico = { chave: "", at: 0, data: null };
 
 export async function lerCardapioPublico(chave) {
-  if (cachePublico.chave === chave && Date.now() - cachePublico.at < 25000 && cachePublico.data) {
+  if (cachePublico.chave === chave && Date.now() - cachePublico.at < 5000 && cachePublico.data) {
     return cachePublico.data;
   }
   const snap = await getDoc(doc(db, "cardapio_publico", chave));
