@@ -7,10 +7,20 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase.js";
 
+let cachePublico = { chave: "", at: 0, data: null };
+
 export async function lerCardapioPublico(chave) {
+  if (cachePublico.chave === chave && Date.now() - cachePublico.at < 25000 && cachePublico.data) {
+    return cachePublico.data;
+  }
   const snap = await getDoc(doc(db, "cardapio_publico", chave));
-  if (!snap.exists()) return null;
-  return snap.data() || null;
+  const data = snap.exists() ? (snap.data() || null) : null;
+  cachePublico = { chave, at: Date.now(), data };
+  return data;
+}
+
+export function invalidarCardapioPublico() {
+  cachePublico = { chave: "", at: 0, data: null };
 }
 
 export function escutarPedidosLoja(chave, onData, onError) {

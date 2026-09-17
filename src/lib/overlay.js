@@ -10,6 +10,17 @@ import {
 import { auth, db, CLOUDINARY_CLOUD, CLOUDINARY_PRESET } from "./firebase.js";
 import { carregarBackupLoja, precoProduto, produtoAtivo } from "./backup.js";
 import { nomeDaLoja } from "./auth.js";
+import { sanitizarGrupos } from "./grupos.js";
+import { soDigitos } from "./format.js";
+
+const CAMPOS_PUBLICOS = [
+  "pausado",
+  "whatsapp",
+  "horarioTexto",
+  "entregaTexto",
+  "pedidoMinimoTexto",
+  "endereco"
+];
 
 async function apiLoja(path, chave, extra = {}) {
   const user = auth.currentUser;
@@ -34,10 +45,21 @@ export async function lerConfig(chave) {
 }
 
 export async function salvarConfig(chave, patch) {
+  const agora = new Date().toISOString();
   await setDoc(doc(db, "cardapio_config", chave), {
     ...patch,
-    atualizadoEm: new Date().toISOString()
+    atualizadoEm: agora
   }, { merge: true });
+  const pubRef = doc(db, "cardapio_publico", chave);
+  const pub = await getDoc(pubRef);
+  if (!pub.exists()) return;
+  const next = { atualizadoEm: agora };
+  CAMPOS_PUBLICOS.forEach((k) => {
+    if (Object.prototype.hasOwnProperty.call(patch, k)) next[k] = patch[k];
+  });
+  if (Object.keys(next).length > 1) {
+    await setDoc(pubRef, next, { merge: true });
+  }
 }
 
 export async function listarOverlays(chave) {
@@ -76,15 +98,24 @@ export async function publicarCardapio(chave) {
       descricao: String(ov.descricao || "").slice(0, 400),
       fotoUrl: String(ov.fotoUrl || ""),
       esgotado: Boolean(ov.esgotado),
+      destaque: Boolean(ov.destaque),
+      idade18: Boolean(ov.idade18),
+      grupos: sanitizarGrupos(ov.grupos),
       unidade: String(p.unidade || p.un || "UN")
     });
   });
+  const cfgLoja = backup.config || {};
   await setDoc(doc(db, "cardapio_publico", chave), {
     chave,
     nome: nomeDaLoja(licenca),
-    logoUrl: String(licenca.logoUrl || ""),
+    logoUrl: String(licenca.logoUrl || cfgLoja.logoUrl || ""),
     pausado: Boolean(config.pausado),
     taxaServico: Number(config.taxaServico) === 0 ? 0 : (Number(config.taxaServico) || 10),
+    whatsapp: soDigitos(config.whatsapp || cfgLoja.whatsapp || licenca.whatsapp || licenca.whatsApp || ""),
+    horarioTexto: String(config.horarioTexto || "").slice(0, 80),
+    entregaTexto: String(config.entregaTexto || "").slice(0, 80),
+    pedidoMinimoTexto: String(config.pedidoMinimoTexto != null ? config.pedidoMinimoTexto : "Sem pedido mínimo").slice(0, 60),
+    endereco: String(config.endereco || licenca.endereco || licenca.cidade || "").slice(0, 120),
     produtos: publicados,
     publicadoEm: new Date().toISOString()
   });

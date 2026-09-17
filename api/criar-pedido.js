@@ -6,6 +6,7 @@ import {
   preflight,
   senhaDaLoja
 } from "./_lib.js";
+import { textoExtras, validarExtras } from "./grupos.js";
 
 const PROJECT = firebaseConfig.projectId;
 const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
@@ -142,17 +143,30 @@ export default async function handler(req, res) {
       }
       const quantidade = Math.max(1, Math.min(99, parseFloat(raw.quantidade) || 0));
       if (!quantidade) return json(res, 400, { error: "Quantidade inválida." });
+      let extras;
+      try {
+        extras = validarExtras(prod, raw && raw.extras);
+      } catch (err) {
+        return json(res, err.status || 400, { error: err.message || "Opções inválidas." });
+      }
+      const extrasTotal = extras.reduce((s, e) => s + (Number(e.preco) || 0) * (Number(e.quantidade) || 1), 0);
       const preco = Number(prod.preco) || 0;
+      const precoUnitario = preco + extrasTotal;
       const observacao = String((raw && raw.observacao) || "").slice(0, 180);
+      const detalhe = textoExtras(extras);
       itens.push({
         id: String(prod.id),
         nome: prod.nome,
         quantidade,
         preco,
+        extras,
+        extrasTotal,
+        precoUnitario,
         observacao,
+        detalhe,
         origemPedidoId: pedidoId
       });
-      total += preco * quantidade;
+      total += precoUnitario * quantidade;
     }
 
     const agora = new Date().toISOString();
@@ -176,7 +190,12 @@ export default async function handler(req, res) {
       status: "novo",
       total,
       nomeLoja: pedido.nomeLoja,
-      itens: itens.map((i) => ({ nome: i.nome, quantidade: i.quantidade })),
+      itens: itens.map((i) => ({
+        nome: i.nome,
+        quantidade: i.quantidade,
+        detalhe: i.detalhe || "",
+        observacao: i.observacao || ""
+      })),
       at: agora,
       atualizadoEm: agora
     };

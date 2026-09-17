@@ -3,6 +3,7 @@ import { soNumeroChave } from "../lib/chave.js";
 import { erroAmigavel } from "../lib/format.js";
 
 export function renderLogin(app) {
+  document.body.className = "is-painel";
   app.innerHTML = `
     <main class="login-page">
       <form class="login-card" id="form-login">

@@ -14,8 +14,26 @@ function parseRota(pathname) {
   if (p === "/" || p === "/painel") return { name: "painel" };
   const pedido = p.match(/^\/([^/]+)\/pedido\/([^/]+)$/);
   if (pedido) return { name: "pedido", chave: normalizarChave(pedido[1]), pedidoId: pedido[2] };
+  const itemMesa = p.match(/^\/([^/]+)\/mesa\/(\d+)\/item\/([^/]+)$/);
+  if (itemMesa) {
+    return {
+      name: "cardapio",
+      chave: normalizarChave(itemMesa[1]),
+      mesa: Number(itemMesa[2]),
+      itemId: decodeURIComponent(itemMesa[3])
+    };
+  }
   const mesa = p.match(/^\/([^/]+)\/mesa\/(\d+)$/);
   if (mesa) return { name: "cardapio", chave: normalizarChave(mesa[1]), mesa: Number(mesa[2]) };
+  const itemLoja = p.match(/^\/([^/]+)\/item\/([^/]+)$/);
+  if (itemLoja && itemLoja[1].toUpperCase() !== "PAINEL") {
+    return {
+      name: "cardapio",
+      chave: normalizarChave(itemLoja[1]),
+      mesa: null,
+      itemId: decodeURIComponent(itemLoja[2])
+    };
+  }
   const loja = p.match(/^\/([^/]+)$/);
   if (loja && loja[1].toUpperCase() !== "PAINEL") {
     return { name: "cardapio", chave: normalizarChave(loja[1]), mesa: null };
@@ -39,6 +57,7 @@ async function render() {
     cleanup = null;
   }
   const rota = parseRota(location.pathname);
+  document.body.className = "";
   document.title = rota.name === "painel" ? "Painel · FlowPDV Cardápio" : "Cardápio · FlowPDV";
 
   if (rota.name === "cardapio") {
@@ -52,6 +71,7 @@ async function render() {
 
   const sessao = await sessaoPainel();
   if (!sessao) {
+    document.body.className = "is-painel";
     renderLogin(app);
     return;
   }

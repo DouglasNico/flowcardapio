@@ -30,3 +30,24 @@ export function erroAmigavel(err) {
 export function originPublico() {
   return window.location.origin.replace(/\/$/, "");
 }
+
+export function soDigitos(valor) {
+  return String(valor || "").replace(/\D/g, "");
+}
+
+export function linkWhatsapp(valor, texto) {
+  let d = soDigitos(valor);
+  if (!d) return "";
+  if (d.length <= 11) d = `55${d}`;
+  const base = `https://wa.me/${d}`;
+  if (!texto) return base;
+  return `${base}?text=${encodeURIComponent(texto)}`;
+}
+
+export function toast(texto, ms = 2800) {
+  const el = document.createElement("div");
+  el.className = "app-toast";
+  el.textContent = texto;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
