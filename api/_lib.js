@@ -106,8 +106,29 @@ export function pastaCloudinary(chave) {
   return `flowpdv/${chave}/produtos`;
 }
 
+export function extrairPublicId(valor) {
+  let id = String(valor || "").trim();
+  if (!id) return "";
+  try { id = decodeURIComponent(id); } catch { /* id original */ }
+  const m = id.match(/\/(?:image|video|raw)\/upload\/(?:v\d+\/)?(.+?)$/i);
+  if (m) id = m[1];
+  return id.replace(/\.(jpe?g|png|webp|gif|bmp|avif)$/i, "");
+}
+
 export function fotoDaLoja(publicId, chave) {
-  const id = String(publicId || "");
-  return id.startsWith(`cardapioflowpdv/${chave}/`)
-    || id.startsWith(`${chave}/produtos/`);
+  const id = extrairPublicId(publicId);
+  const loja = String(chave || "");
+  if (!id || !loja) return false;
+  return id.startsWith(`cardapioflowpdv/${loja}/`)
+    || id.startsWith(`${loja}/produtos/`)
+    || id.startsWith(`flowpdv/${loja}/`)
+    || id.includes(`/${loja}/produtos/`);
+}
+
+export function idsDestroy(publicId, chave) {
+  const base = extrairPublicId(publicId);
+  const ids = [base];
+  if (base.startsWith("flowpdv/")) ids.push(base.replace(/^flowpdv\//, ""));
+  else if (chave) ids.push(`flowpdv/${base}`);
+  return [...new Set(ids.filter(Boolean))];
 }

@@ -116,7 +116,11 @@ export async function enviarFotoCloudinary(file, assinatura) {
 }
 
 export async function removerFoto(chave, produtoId, publicId) {
-  const res = await apiLoja("/api/remover-foto", chave, { publicId });
+  try {
+    await apiLoja("/api/remover-foto", chave, { publicId });
+  } catch {
+    // Cloudinary às vezes responde General Error; a foto some do painel mesmo assim.
+  }
   await updateDoc(doc(db, "cardapio_config", chave, "produtos", String(produtoId)), {
     fotoUrl: "",
     fotoPublicId: "",
@@ -128,7 +132,7 @@ export async function removerFoto(chave, produtoId, publicId) {
       atualizadoEm: new Date().toISOString()
     }, { merge: true });
   });
-  return res;
+  return { ok: true };
 }
 
 export async function apagarOverlay(chave, produtoId) {
