@@ -103,30 +103,11 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
     });
   }
 
-  function pintar() {
-    wrap.innerHTML = `
-      <div class="modal-card" role="dialog" aria-labelledby="ed-titulo">
-        <header class="editor-head">
-          <div>
-            <h2 id="ed-titulo">Opções do item</h2>
-            <p>${esc(produto.nome || "")}</p>
-          </div>
-          <button type="button" class="icon-btn" id="ed-fechar" aria-label="Fechar">✕</button>
-        </header>
-        <p class="editor-help">Isso aparece quando o cliente toca no lanche. Salvar já atualiza o cardápio público.</p>
-        <div class="editor-templates">
-          ${TEMPLATES.map((t, i) => `<button type="button" class="btn-ghost" data-tpl="${i}">+ ${esc(t.nome)}</button>`).join("")}
-        </div>
-        <div id="ed-grupos"></div>
-        <button type="button" class="btn-ghost" id="ed-add-g">+ Grupo em branco</button>
-        <div class="editor-actions">
-          <button type="button" class="btn-ghost" id="ed-cancelar">Cancelar</button>
-          <button type="button" class="btn-primary" id="ed-salvar">Salvar no cardápio</button>
-        </div>
-      </div>
-    `;
-    const box = wrap.querySelector("#ed-grupos");
-    box.innerHTML = grupos.length ? grupos.map((g, gi) => `
+  function htmlGrupos() {
+    if (!grupos.length) {
+      return `<div class="empty-card"><h2>Nenhuma opção ainda</h2><p>Toca num modelo acima. Já vem bacon, molho ou ponto da carne prontos pra você só ajustar o preço.</p></div>`;
+    }
+    return grupos.map((g, gi) => `
       <section class="ed-group" data-gi="${gi}">
         <div class="ed-group-top">
           <input data-nome placeholder="Nome do grupo" value="${esc(g.nome)}">
@@ -157,55 +138,36 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
           <button type="button" class="btn-ghost" data-imp="bebida">Puxar Bebidas do PDV</button>
         </div>
       </section>
-    `).join("") : `<div class="empty-card"><h2>Nenhuma opção ainda</h2><p>Toca num modelo acima. Já vem bacon, molho ou ponto da carne prontos pra você só ajustar o preço.</p></div>`;
+    `).join("");
+  }
 
-    wrap.querySelector("#ed-fechar").addEventListener("click", fechar);
-    wrap.querySelector("#ed-cancelar").addEventListener("click", fechar);
-    wrap.querySelector("#ed-add-g").addEventListener("click", () => {
-      lerCampos();
-      grupos.push(grupoVazio({ nome: "Novo grupo" }));
-      pintar();
-    });
-    wrap.querySelectorAll("[data-tpl]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        lerCampos();
-        grupos.push(grupoVazio(TEMPLATES[Number(btn.dataset.tpl)]));
-        pintar();
-      });
-    });
-    wrap.querySelector("#ed-salvar").addEventListener("click", async () => {
-      lerCampos();
-      const limpos = sanitizarGrupos(grupos);
-      const digitou = grupos.some((g) => (g.opcoes || []).some((o) => String(o.nome || "").trim()));
-      if (!limpos.length && digitou) {
-        toast("Cada opção precisa de um nome.");
-        return;
-      }
-      const btnSalvar = wrap.querySelector("#ed-salvar");
-      btnSalvar.disabled = true;
-      btnSalvar.textContent = "Salvando...";
-      try {
-        await onSave(limpos);
-        fechar();
-      } catch (err) {
-        toast(String(err.message || err));
-        btnSalvar.disabled = false;
-        btnSalvar.textContent = "Salvar no cardápio";
-      }
-    });
+  function focarCampo(gi, ultimo) {
+    const sec = wrap.querySelector(`.ed-group[data-gi="${gi}"]`);
+    if (!sec) return;
+    const campos = [...sec.querySelectorAll("[data-onome]")];
+    const el = ultimo ? campos[campos.length - 1] : campos[0];
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
 
+  function pintarGrupos(foco) {
+    const card = wrap.querySelector(".modal-card");
+    const y = card ? card.scrollTop : 0;
+    const box = wrap.querySelector("#ed-grupos");
+    box.innerHTML = htmlGrupos();
     box.querySelectorAll(".ed-group").forEach((sec) => {
       const gi = Number(sec.dataset.gi);
       sec.querySelector("[data-del-g]").addEventListener("click", () => {
         lerCampos();
         grupos.splice(gi, 1);
-        pintar();
+        pintarGrupos();
       });
       sec.querySelector("[data-add-o]").addEventListener("click", () => {
         lerCampos();
         grupos[gi].opcoes = grupos[gi].opcoes || [];
         grupos[gi].opcoes.push(opcaoVazia());
-        pintar();
+        pintarGrupos({ gi, ultimo: true });
       });
       sec.querySelectorAll("[data-imp]").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -228,7 +190,7 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
             }));
           });
           toast(`${hits.length} itens puxados do PDV.`);
-          pintar();
+          pintarGrupos({ gi, ultimo: true });
         });
       });
       sec.querySelectorAll("[data-del-o]").forEach((btn) => {
@@ -236,13 +198,71 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
           const row = btn.closest(".ed-opt");
           lerCampos();
           grupos[gi].opcoes.splice(Number(row.dataset.oi), 1);
-          pintar();
+          pintarGrupos({ gi });
         });
       });
     });
+    if (card) card.scrollTop = y;
+    if (foco && foco.gi != null) focarCampo(foco.gi, foco.ultimo);
   }
 
+  wrap.innerHTML = `
+    <div class="modal-card" role="dialog" aria-labelledby="ed-titulo">
+      <header class="editor-head">
+        <div>
+          <h2 id="ed-titulo">Opções do item</h2>
+          <p>${esc(produto.nome || "")}</p>
+        </div>
+        <button type="button" class="icon-btn" id="ed-fechar" aria-label="Fechar">✕</button>
+      </header>
+      <p class="editor-help">Isso aparece quando o cliente toca no lanche. Salvar já atualiza o cardápio público.</p>
+      <div class="editor-templates">
+        ${TEMPLATES.map((t, i) => `<button type="button" class="btn-ghost" data-tpl="${i}">+ ${esc(t.nome)}</button>`).join("")}
+      </div>
+      <div id="ed-grupos"></div>
+      <button type="button" class="btn-ghost" id="ed-add-g">+ Grupo em branco</button>
+      <div class="editor-actions">
+        <button type="button" class="btn-ghost" id="ed-cancelar">Cancelar</button>
+        <button type="button" class="btn-primary" id="ed-salvar">Salvar no cardápio</button>
+      </div>
+    </div>
+  `;
+
+  wrap.querySelector("#ed-fechar").addEventListener("click", fechar);
+  wrap.querySelector("#ed-cancelar").addEventListener("click", fechar);
+  wrap.querySelector("#ed-add-g").addEventListener("click", () => {
+    lerCampos();
+    grupos.push(grupoVazio({ nome: "Novo grupo" }));
+    pintarGrupos({ gi: grupos.length - 1 });
+  });
+  wrap.querySelectorAll("[data-tpl]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      lerCampos();
+      grupos.push(grupoVazio(TEMPLATES[Number(btn.dataset.tpl)]));
+      pintarGrupos({ gi: grupos.length - 1 });
+    });
+  });
+  wrap.querySelector("#ed-salvar").addEventListener("click", async () => {
+    lerCampos();
+    const limpos = sanitizarGrupos(grupos);
+    const digitou = grupos.some((g) => (g.opcoes || []).some((o) => String(o.nome || "").trim()));
+    if (!limpos.length && digitou) {
+      toast("Cada opção precisa de um nome.");
+      return;
+    }
+    const btnSalvar = wrap.querySelector("#ed-salvar");
+    btnSalvar.disabled = true;
+    btnSalvar.textContent = "Salvando...";
+    try {
+      await onSave(limpos);
+      fechar();
+    } catch (err) {
+      toast(String(err.message || err));
+      btnSalvar.disabled = false;
+      btnSalvar.textContent = "Salvar no cardápio";
+    }
+  });
   wrap.addEventListener("click", (ev) => { if (ev.target === wrap) fechar(); });
-  pintar();
+  pintarGrupos();
   return fechar;
 }
