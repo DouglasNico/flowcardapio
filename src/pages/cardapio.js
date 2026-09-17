@@ -216,6 +216,13 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   function topoLoja(extra = "") {
     const aberto = !publico.pausado;
     const canal = mesa ? `Mesa ${mesa}` : "Retirada";
+    const min = String(publico.pedidoMinimoTexto || "").trim();
+    const mostraMin = min && !/^sem pedido m[ií]nimo\.?$/i.test(min);
+    const meta = [
+      aberto ? "Aberto agora" : "Fechado",
+      publico.horarioTexto,
+      publico.endereco
+    ].filter(Boolean).join(" · ");
     return `
       <header class="store-head">
         <div class="store-row">
@@ -223,12 +230,8 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
             ? `<img class="store-logo" src="${esc(publico.logoUrl)}" alt="">`
             : `<div class="store-logo ph-logo">${esc(iniciais(publico.nome))}</div>`}
           <div class="store-meta">
-            <div class="store-kicker">
-              <span class="store-status ${aberto ? "on" : "off"}">${aberto ? "Aberto" : "Fechado"}</span>
-              ${publico.horarioTexto ? `<span class="store-hora">${esc(publico.horarioTexto)}</span>` : ""}
-            </div>
             <h1>${esc(publico.nome || "Cardápio")}</h1>
-            ${publico.endereco ? `<p class="store-end">${esc(publico.endereco)}</p>` : ""}
+            <p class="store-end"><span class="store-status ${aberto ? "on" : "off"}"></span>${esc(meta)}</p>
           </div>
           <div class="store-tools">
             <button type="button" class="icon-btn" id="btn-busca" aria-label="Buscar">${ico.search}</button>
@@ -238,7 +241,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         <div class="store-sub">
           <span class="canal ${mesa ? "mesa" : "retirada"}">${esc(canal)}</span>
           ${aberto && publico.entregaTexto ? `<span class="chip-info">${esc(publico.entregaTexto)}</span>` : ""}
-          ${aberto && publico.pedidoMinimoTexto ? `<span class="chip-info">${esc(publico.pedidoMinimoTexto)}</span>` : ""}
+          ${aberto && mostraMin ? `<span class="chip-info">${esc(min)}</span>` : ""}
         </div>
         ${extra}
       </header>
@@ -274,20 +277,27 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     return;
   }
 
-  function cardProduto(p, destaque) {
+  function cardProduto(p, destaque, todosDestaque) {
     const foto = p.fotoUrl
       ? `<img src="${esc(p.fotoUrl)}" alt="">`
       : `<div class="ph">${ico.photo}</div>`;
+    if (destaque) {
+      return `
+        <article class="spot-card" data-open="${esc(p.id)}" role="button" tabindex="0">
+          <div class="spot-media">${foto}
+            <span class="spot-cap"><b>${esc(p.nome)}</b><small>${esc(rotuloPreco(p))}</small></span>
+          </div>
+        </article>`;
+    }
     return `
-      <article class="${destaque ? "spot-card" : "menu-item"}" data-open="${esc(p.id)}" role="button" tabindex="0">
-        ${destaque ? `<div class="spot-media">${foto}</div>` : ""}
+      <article class="menu-item" data-open="${esc(p.id)}" role="button" tabindex="0">
         <div class="menu-copy">
-          ${p.destaque && !destaque ? `<em class="fav">Mais pedido</em>` : ""}
+          ${p.destaque && !todosDestaque ? `<em class="fav">Mais pedido</em>` : ""}
           <h3>${esc(p.nome)}</h3>
-          ${!destaque && p.descricao ? `<p>${esc(p.descricao)}</p>` : ""}
+          ${p.descricao ? `<p>${esc(p.descricao)}</p>` : ""}
           <strong>${esc(rotuloPreco(p))}</strong>
         </div>
-        ${destaque ? "" : `<div class="menu-media">${foto}<span class="add-dot">${ico.plus}</span></div>`}
+        <div class="menu-media">${foto}<span class="add-dot">${ico.plus}</span></div>
       </article>
     `;
   }
@@ -297,35 +307,40 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const lista = q
       ? produtos.filter((p) => `${p.nome} ${p.descricao || ""} ${p.categoria || ""}`.toLowerCase().includes(q))
       : produtos;
-    const destaques = produtos.filter((p) => p.destaque).slice(0, 12);
+    const destaquesAll = produtos.filter((p) => p.destaque);
+    const todosDestaque = produtos.length > 0 && destaquesAll.length >= produtos.length;
+    const destaques = (!q && !todosDestaque) ? destaquesAll.slice(0, 8) : [];
     const cats = q ? [] : [...new Set(lista.map((p) => p.categoria || "Geral"))];
+    const extraTopo = [
+      buscaAberta || q ? `
+        <div class="store-search">
+          <input type="search" id="menu-busca" placeholder="Buscar no cardápio" value="${esc(busca)}">
+        </div>` : "",
+      cats.length ? `
+        <nav class="cats" aria-label="Categorias">
+          ${cats.map((c, i) => `<a href="#${idCategoria(c)}" class="${i === 0 ? "on" : ""}">${esc(c)}</a>`).join("")}
+        </nav>` : ""
+    ].join("");
 
     app.innerHTML = `
       <div class="menu-frame">
         <div class="menu-page ${nItens() ? "has-cart" : ""}">
-          ${topoLoja(buscaAberta || q ? `
-            <div class="store-search">
-              <input type="search" id="menu-busca" placeholder="Buscar no cardápio" value="${esc(busca)}">
-            </div>` : "")}
-          ${!q && cats.length ? `
-            <nav class="cats" aria-label="Categorias">
-              ${cats.map((c) => `<a href="#${idCategoria(c)}">${esc(c)}</a>`).join("")}
-            </nav>` : ""}
-          ${!q && destaques.length ? `
+          ${topoLoja(extraTopo)}
+          ${destaques.length ? `
             <section class="spot-wrap">
               <h2>Mais pedidos</h2>
-              <div class="spot-row">${destaques.map((p) => cardProduto(p, true)).join("")}</div>
+              <div class="spot-row">${destaques.map((p) => cardProduto(p, true, todosDestaque)).join("")}</div>
             </section>` : ""}
           <div class="menu-list">
             ${q ? `
               <h2 class="sec-title">${lista.length ? "Resultados" : "Nada encontrado"}</h2>
-              ${lista.map((p) => cardProduto(p, false)).join("")}
+              ${lista.map((p) => cardProduto(p, false, todosDestaque)).join("")}
             ` : cats.map((c) => {
               const itens = lista.filter((p) => (p.categoria || "Geral") === c);
               return `
                 <section class="menu-sec" id="${idCategoria(c)}">
                   <h2 class="sec-title">${esc(c)}</h2>
-                  ${itens.map((p) => cardProduto(p, false)).join("")}
+                  ${itens.map((p) => cardProduto(p, false, todosDestaque)).join("")}
                 </section>`;
             }).join("")}
           </div>
@@ -520,6 +535,11 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         pintar();
       });
     }
+    app.querySelectorAll(".cats a").forEach((a) => {
+      a.addEventListener("click", () => {
+        app.querySelectorAll(".cats a").forEach((x) => x.classList.toggle("on", x === a));
+      });
+    });
     app.querySelectorAll("[data-open]").forEach((el) => {
       const go = () => abrirItem(el.dataset.open);
       el.addEventListener("click", go);
