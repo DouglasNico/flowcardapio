@@ -250,7 +250,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     return `
       <div class="menu-frame">
         <div class="menu-page">
-          ${loja ? topoLoja() : `<header class="store-head"><h1>${esc(titulo)}</h1></header>`}
+          ${loja ? topoLoja() : ""}
           <div class="closed-box">
             <h2>${esc(titulo)}</h2>
             <p>${esc(texto)}</p>
@@ -284,7 +284,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         <div class="menu-copy">
           ${p.destaque && !destaque ? `<em class="fav">Mais pedido</em>` : ""}
           <h3>${esc(p.nome)}</h3>
-          ${p.descricao ? `<p>${esc(p.descricao)}</p>` : ""}
+          ${!destaque && p.descricao ? `<p>${esc(p.descricao)}</p>` : ""}
           <strong>${esc(rotuloPreco(p))}</strong>
         </div>
         ${destaque ? "" : `<div class="menu-media">${foto}<span class="add-dot">${ico.plus}</span></div>`}

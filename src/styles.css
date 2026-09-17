@@ -311,7 +311,7 @@ svg { display: block; }
 .spot-media .ph svg, .menu-media .ph svg, .ph-hero svg { width: 28px; height: 28px; }
 .spot-card .menu-copy { padding: 8px 2px 0; }
 .spot-card h3 { margin: 0 0 4px; font-size: 14px; }
-.spot-card p { display: none; }
+.spot-card p, .spot-card .menu-copy p { display: none; }
 .spot-card strong { font-size: 13px; color: var(--slate); font-weight: 700; }
 
 .menu-list { padding: 0 12px 28px; display: grid; gap: 8px; }
@@ -371,7 +371,8 @@ svg { display: block; }
   display: grid; align-items: end;
 }
 .sheet-card {
-  background: var(--paper); border-radius: 26px 26px 0 0; padding: 10px 18px 24px; max-height: 88dvh; overflow: auto;
+  background: var(--paper); border-radius: 26px 26px 0 0; padding: 10px 18px 24px;
+  max-height: 88dvh; overflow: auto; width: min(var(--frame), 100%); justify-self: center;
 }
 .sheet-grab {
   width: 42px; height: 4px; background: #ddd4c8; border-radius: 999px; margin: 6px auto 10px;
