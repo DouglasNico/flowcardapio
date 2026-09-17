@@ -102,6 +102,10 @@ export function publicIdProduto(chave, produtoId) {
   return `${chave}/produtos/${id}`;
 }
 
+export function pastaCloudinary(chave) {
+  return `flowpdv/${chave}/produtos`;
+}
+
 export function fotoDaLoja(publicId, chave) {
   const id = String(publicId || "");
   return id.startsWith(`cardapioflowpdv/${chave}/`)

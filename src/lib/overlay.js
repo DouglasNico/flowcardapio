@@ -102,6 +102,7 @@ export async function enviarFotoCloudinary(file, assinatura) {
   body.append("timestamp", String(assinatura.timestamp));
   body.append("signature", assinatura.signature);
   body.append("public_id", assinatura.publicId);
+  if (assinatura.assetFolder) body.append("asset_folder", assinatura.assetFolder);
   body.append("overwrite", "true");
   body.append("invalidate", "true");
   body.append("upload_preset", CLOUDINARY_PRESET);

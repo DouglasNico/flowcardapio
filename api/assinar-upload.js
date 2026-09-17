@@ -6,6 +6,7 @@ import {
   normalizarChave,
   preflight,
   publicIdProduto,
+  pastaCloudinary,
   secretCloudinary,
   CLOUD_NAME,
   CLOUDINARY_API_KEY,
@@ -20,8 +21,10 @@ export default async function handler(req, res) {
     const produtoId = String((req.body && req.body.produtoId) || "").trim();
     await exigirLojaToken(bearer(req), chave);
     const publicId = publicIdProduto(chave, produtoId);
+    const assetFolder = pastaCloudinary(chave);
     const timestamp = Math.floor(Date.now() / 1000);
     const params = {
+      asset_folder: assetFolder,
       invalidate: "true",
       overwrite: "true",
       public_id: publicId,
@@ -36,6 +39,7 @@ export default async function handler(req, res) {
       timestamp,
       signature,
       publicId,
+      assetFolder,
       uploadPreset: PRESET
     });
   } catch (err) {
