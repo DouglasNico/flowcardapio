@@ -1,5 +1,6 @@
 import { escutarPedidoPublico } from "../lib/pedidos.js";
 import { brl, erroAmigavel, esc } from "../lib/format.js";
+import { ico } from "../lib/icons.js";
 
 const PASSOS = [
   { id: "novo", label: "Enviado" },
@@ -42,23 +43,29 @@ export function renderPedido(app, { chave, pedidoId }) {
       </li>`;
     }).join("");
     const voltar = `/${chave}${pedido.numeroMesa ? `/mesa/${pedido.numeroMesa}` : ""}`;
+    const canal = pedido.tipo === "mesa" ? `Mesa ${pedido.numeroMesa}` : "Retirada no balcão";
     app.innerHTML = `
       <div class="menu-frame">
         <div class="menu-page track-page">
           <header class="store-head">
-            <h1>${esc(pedido.nomeLoja || "Pedido")}</h1>
-            <p>${pedido.tipo === "mesa" ? `Mesa ${esc(pedido.numeroMesa)}` : "Retirada no balcão"}</p>
+            <div class="store-row">
+              <div class="store-meta">
+                <h1>${esc(pedido.nomeLoja || "Pedido")}</h1>
+                <p class="store-end">${esc(canal)}</p>
+              </div>
+            </div>
           </header>
           <div class="track-card">
             <p class="badge ${esc(pedido.status || "novo")}">${esc(ROTULO[pedido.status] || pedido.status)}</p>
+            <p class="track-id">Pedido ${esc(String(pedido.id || "").slice(-6).toUpperCase())}</p>
             ${cancelado ? "" : `
               <ol class="steps">
-                ${PASSOS.map((p, i) => `<li class="${i <= idx ? "done" : ""}">${esc(p.label)}</li>`).join("")}
+                ${PASSOS.map((p, i) => `<li class="${i < idx ? "done" : i === idx ? "now" : ""}">${esc(p.label)}</li>`).join("")}
               </ol>
             `}
-            <ul class="pedido-itens track-itens">${itens}</ul>
-            <p class="track-total"><strong>${brl(pedido.total)}</strong></p>
-            <a class="btn-primary" href="${esc(voltar)}">Pedir de novo</a>
+            <ul class="track-itens">${itens}</ul>
+            <div class="track-total"><span>Total</span><strong>${brl(pedido.total)}</strong></div>
+            <a class="btn-primary" href="${esc(voltar)}">${ico.back} Pedir de novo</a>
           </div>
         </div>
       </div>

@@ -73,7 +73,7 @@ export async function renderPainel(app, sessao) {
           <img src="/logos/FlowPDV-horizontal-claro.png" alt="FlowPDV">
           <div class="meta">
             <strong>${esc(nomeDaLoja(licenca))}</strong>
-            <small>${chave}</small>
+            <small>Painel do cardápio · ${chave}</small>
           </div>
         </div>
         <nav class="tabs">
@@ -174,21 +174,27 @@ export async function renderPainel(app, sessao) {
 
   function pintarLoja() {
     main.innerHTML = `
+      <section class="page-head">
+        <div>
+          <h2>Dados da loja</h2>
+          <p>Isso aparece no topo do cardápio. Horário e WhatsApp atualizam na hora; produtos só depois de publicar.</p>
+        </div>
+      </section>
       <div class="card loja-card">
-        <h2>Vitrine do cardápio</h2>
-        <p class="editor-help">Isso aparece no topo do cardápio do cliente. Horário e WhatsApp atualizam na hora; produtos só depois de Publicar.</p>
         <div class="loja-grid">
           <label>WhatsApp (com DDD)<input id="lj-wa" inputmode="numeric" placeholder="19999999999" value="${esc(config.whatsapp || "")}"></label>
           <label>Endereço / bairro<input id="lj-end" placeholder="Jardim Santa Izabel, Hortolândia" value="${esc(config.endereco || "")}"></label>
-          <label>Horário (texto no topo)<input id="lj-hora" placeholder="Aberto até 23:00 · Ter a Dom" value="${esc(config.horarioTexto || "")}"></label>
+          <label>Horário<input id="lj-hora" placeholder="Ter a Dom · 18:00–23:00" value="${esc(config.horarioTexto || "")}"></label>
           <label>Entrega<input id="lj-ent" placeholder="40–70 min" value="${esc(config.entregaTexto || "")}"></label>
           <label>Pedido mínimo<input id="lj-min" placeholder="Sem pedido mínimo" value="${esc(config.pedidoMinimoTexto != null ? config.pedidoMinimoTexto : "Sem pedido mínimo")}"></label>
         </div>
-        <label class="switch" style="margin:12px 0">
-          <input type="checkbox" id="pausado" ${config.pausado ? "checked" : ""}>
-          Pausar cardápio (fecha para o cliente)
-        </label>
-        <button class="btn-primary" id="lj-salvar" type="button" style="width:auto">Salvar dados da loja</button>
+        <div class="loja-foot">
+          <label class="switch">
+            <input type="checkbox" id="pausado" ${config.pausado ? "checked" : ""}>
+            Pausar cardápio
+          </label>
+          <button class="btn-primary" id="lj-salvar" type="button" style="width:auto">Salvar</button>
+        </div>
       </div>
     `;
     main.querySelector("#pausado").addEventListener("change", async (ev) => {
@@ -222,12 +228,17 @@ export async function renderPainel(app, sessao) {
   function pintarCardapio() {
     const visiveis = produtos.filter((p) => overlays[p.id] && overlays[p.id].visivel).length;
     main.innerHTML = `
-      <div class="toolbar">
-        <input type="search" id="busca" placeholder="Buscar produto">
-        <button class="btn-primary" id="btn-publicar" type="button" style="width:auto">Publicar cardápio (${visiveis})</button>
-      </div>
-      <p class="editor-help">Marque <b>No cardápio</b>, foto, descrição e <b>Mais pedido</b>. Em <b>Opções</b> você monta adicionais e combo do lanche. Depois publique.</p>
-      <div class="card" id="lista"></div>
+      <section class="page-head">
+        <div>
+          <h2>Produtos</h2>
+          <p>Marque os itens, coloque foto e opções, depois publique para o QR atualizar.</p>
+        </div>
+        <div class="toolbar">
+          <input type="search" id="busca" placeholder="Buscar produto">
+          <button class="btn-primary" id="btn-publicar" type="button" style="width:auto">Publicar (${visiveis})</button>
+        </div>
+      </section>
+      <div class="prod-list" id="lista"></div>
     `;
     const busca = main.querySelector("#busca");
     busca.value = filtro;
@@ -243,7 +254,7 @@ export async function renderPainel(app, sessao) {
         toast(erroAmigavel(err));
       } finally {
         ev.target.disabled = false;
-        ev.target.textContent = `Publicar cardápio (${visiveis})`;
+        ev.target.textContent = `Publicar (${visiveis})`;
       }
     });
     pintarLista();
@@ -260,35 +271,38 @@ export async function renderPainel(app, sessao) {
     lista.innerHTML = rows.map((p) => {
       const ov = overlays[p.id] || {};
       const nOp = (ov.grupos && ov.grupos.length) || 0;
-      const foto = ov.fotoUrl ? `<img class="thumb" src="${ov.fotoUrl}" alt="">` : `<div class="thumb">FOTO</div>`;
+      const foto = ov.fotoUrl ? `<img class="thumb" src="${ov.fotoUrl}" alt="">` : `<div class="thumb">${esc((p.nome || "?").slice(0, 1))}</div>`;
       return `
-        <article class="prod-row" data-id="${p.id}">
+        <article class="prod-card ${ov.visivel ? "on" : ""}" data-id="${p.id}">
           ${foto}
-          <div>
-            <h3>${esc(p.nome || "Sem nome")}${ov.destaque ? ` <span class="fav">Mais pedido</span>` : ""}</h3>
-            <div class="cat">${esc(p.categoria || "Geral")} · ${brl(precoProduto(p))}${nOp ? ` · ${nOp} grupo(s)` : ""}</div>
-            <textarea data-desc placeholder="Descrição no cardápio"></textarea>
-          </div>
-          <div class="actions">
-            <label class="switch"><input type="checkbox" data-visivel ${ov.visivel ? "checked" : ""}> No cardápio</label>
-            <label class="switch"><input type="checkbox" data-destaque ${ov.destaque ? "checked" : ""}> Mais pedido</label>
-            <label class="switch"><input type="checkbox" data-esgotado ${ov.esgotado ? "checked" : ""}> Esgotado</label>
-            <label class="switch"><input type="checkbox" data-18 ${ov.idade18 ? "checked" : ""}> 18+</label>
-            <label class="btn-ghost file-btn">Foto<input type="file" accept="image/jpeg,image/png,image/webp"></label>
-            ${ov.fotoPublicId ? `<button type="button" class="btn-ghost" data-del-foto>Apagar foto</button>` : ""}
-            <button type="button" class="btn-ghost" data-opcoes>Opções${nOp ? ` (${nOp})` : ""}</button>
+          <div class="prod-card-body">
+            <div class="prod-card-top">
+              <h3>${esc(p.nome || "Sem nome")}</h3>
+              <b>${brl(precoProduto(p))}</b>
+            </div>
+            <div class="cat">${esc(p.categoria || "Geral")}${nOp ? ` · ${nOp} grupo${nOp > 1 ? "s" : ""} de opção` : ""}${ov.destaque ? " · Destaque" : ""}</div>
+            <textarea data-desc placeholder="Descrição que o cliente lê no cardápio"></textarea>
+            <div class="chip-row">
+              <label class="chip${ov.visivel ? " on" : ""}"><input type="checkbox" data-visivel ${ov.visivel ? "checked" : ""}> No cardápio</label>
+              <label class="chip${ov.destaque ? " on" : ""}"><input type="checkbox" data-destaque ${ov.destaque ? "checked" : ""}> Mais pedido</label>
+              <label class="chip warn${ov.esgotado ? " on" : ""}"><input type="checkbox" data-esgotado ${ov.esgotado ? "checked" : ""}> Esgotado</label>
+            </div>
+            <div class="prod-card-actions">
+              <label class="btn-ghost file-btn">Foto<input type="file" accept="image/jpeg,image/png,image/webp"></label>
+              ${ov.fotoPublicId ? `<button type="button" class="btn-ghost" data-del-foto>Apagar foto</button>` : ""}
+              <button type="button" class="btn-ghost" data-opcoes>Opções${nOp ? ` (${nOp})` : ""}</button>
+            </div>
           </div>
         </article>
       `;
     }).join("");
 
-    lista.querySelectorAll(".prod-row").forEach((row) => {
+    lista.querySelectorAll(".prod-card").forEach((row) => {
       const id = row.dataset.id;
       const prod = produtos.find((p) => String(p.id) === String(id));
       row.querySelector("[data-visivel]").addEventListener("change", (ev) => patchOverlay(id, { visivel: ev.target.checked }));
       row.querySelector("[data-destaque]").addEventListener("change", (ev) => patchOverlay(id, { destaque: ev.target.checked }));
       row.querySelector("[data-esgotado]").addEventListener("change", (ev) => patchOverlay(id, { esgotado: ev.target.checked }));
-      row.querySelector("[data-18]").addEventListener("change", (ev) => patchOverlay(id, { idade18: ev.target.checked }));
       row.querySelector('input[type="file"]').addEventListener("change", (ev) => {
         const file = ev.target.files && ev.target.files[0];
         onFoto(id, file);
@@ -338,27 +352,35 @@ export async function renderPainel(app, sessao) {
   function pintarPedidos() {
     garantirPedidos();
     if (!pedidos.length) {
-      main.innerHTML = `<p class="empty">Nenhum pedido ainda. Publique o cardápio e teste o QR.</p>`;
+      main.innerHTML = `<div class="empty-card"><h2>Nenhum pedido ainda</h2><p>Publique o cardápio e teste o QR da mesa ou o link de retirada.</p></div>`;
       return;
     }
-    main.innerHTML = pedidos.map((p) => {
-      const prox = proximoStatus(p.status);
-      const itens = (p.itens || []).map((i) => `<li>${linhaPedidoItem(i)}</li>`).join("");
-      const onde = p.tipo === "mesa" ? `Mesa ${p.numeroMesa}` : "Retirada";
-      return `
-        <article class="pedido">
-          <header>
-            <strong>${onde} · ${brl(p.total)}</strong>
-            <span class="badge ${p.status || "novo"}">${rotuloStatus(p.status)}</span>
-          </header>
-          <ul class="pedido-itens">${itens}</ul>
-          <div class="pedido-btns">
-            ${prox ? `<button class="btn-primary" data-st="${prox}" data-id="${p.id}" style="width:auto">${rotuloStatus(prox)}</button>` : ""}
-            ${p.status !== "cancelado" && p.status !== "entregue" ? `<button class="btn-ghost" data-st="cancelado" data-id="${p.id}">Cancelar</button>` : ""}
-          </div>
-        </article>
-      `;
-    }).join("");
+    main.innerHTML = `
+      <section class="page-head"><div><h2>Pedidos ao vivo</h2><p>Novos pedidos avisam com um som. Avance o status conforme a cozinha.</p></div></section>
+      <div class="pedido-list">
+        ${pedidos.map((p) => {
+          const prox = proximoStatus(p.status);
+          const itens = (p.itens || []).map((i) => `<li>${linhaPedidoItem(i)}</li>`).join("");
+          const onde = p.tipo === "mesa" ? `Mesa ${p.numeroMesa}` : "Retirada";
+          return `
+            <article class="pedido">
+              <header>
+                <div>
+                  <strong>${onde}</strong>
+                  <small>${brl(p.total)} · ${esc(String(p.id || "").slice(-6).toUpperCase())}</small>
+                </div>
+                <span class="badge ${p.status || "novo"}">${rotuloStatus(p.status)}</span>
+              </header>
+              <ul class="pedido-itens">${itens}</ul>
+              <div class="pedido-btns">
+                ${prox ? `<button class="btn-primary" data-st="${prox}" data-id="${p.id}" style="width:auto">${rotuloStatus(prox)}</button>` : ""}
+                ${p.status !== "cancelado" && p.status !== "entregue" ? `<button class="btn-ghost" data-st="cancelado" data-id="${p.id}">Cancelar</button>` : ""}
+              </div>
+            </article>
+          `;
+        }).join("")}
+      </div>
+    `;
     main.querySelectorAll("[data-st]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         try {
@@ -371,19 +393,25 @@ export async function renderPainel(app, sessao) {
   async function pintarQr() {
     const urlLoja = `${originPublico()}/${chave}`;
     main.innerHTML = `
+      <section class="page-head">
+        <div>
+          <h2>QR e links</h2>
+          <p>Cole o QR na mesa. O link da loja é a retirada no balcão.</p>
+        </div>
+      </section>
       <div class="qr-grid">
         <div class="card">
-          <h2>QR da mesa</h2>
+          <h3>QR da mesa</h3>
           <label>Número da mesa</label>
           <div class="toolbar" style="margin:8px 0 0">
             <input type="number" id="mesa-n" min="1" value="1">
-            <button class="btn-primary" id="btn-qr" type="button" style="width:auto">Gerar QR</button>
+            <button class="btn-primary" id="btn-qr" type="button" style="width:auto">Gerar</button>
           </div>
           <p class="qr-link" id="qr-link"></p>
         </div>
-        <div class="card" id="qr-box"><p class="empty">Escolha a mesa e gere o QR para colar na mesa.</p></div>
+        <div class="card qr-preview" id="qr-box"><p class="empty">Gere o QR da mesa.</p></div>
         <div class="card">
-          <h2>Link da loja (retirada)</h2>
+          <h3>Retirada</h3>
           <p class="qr-link">${esc(urlLoja)}</p>
           <div id="qr-loja"></div>
         </div>

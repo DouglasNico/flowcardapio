@@ -1,7 +1,7 @@
 import { criarPedido, lerCardapioPublico } from "../lib/pedidos.js";
 import { brl, erroAmigavel, esc, linkWhatsapp, toast } from "../lib/format.js";
+import { ico } from "../lib/icons.js";
 import {
-  iconeCategoria,
   idCategoria,
   mostraAPartirDe,
   precoLinha,
@@ -215,6 +215,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
 
   function topoLoja(extra = "") {
     const aberto = !publico.pausado;
+    const canal = mesa ? `Mesa ${mesa}` : "Retirada";
     return `
       <header class="store-head">
         <div class="store-row">
@@ -222,20 +223,23 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
             ? `<img class="store-logo" src="${esc(publico.logoUrl)}" alt="">`
             : `<div class="store-logo ph-logo">${esc(iniciais(publico.nome))}</div>`}
           <div class="store-meta">
-            <div class="store-status ${aberto ? "on" : "off"}">${aberto ? "Aberto" : "Fechado"}${publico.horarioTexto ? ` · ${esc(publico.horarioTexto)}` : ""}</div>
+            <div class="store-kicker">
+              <span class="store-status ${aberto ? "on" : "off"}">${aberto ? "Aberto" : "Fechado"}</span>
+              ${publico.horarioTexto ? `<span class="store-hora">${esc(publico.horarioTexto)}</span>` : ""}
+            </div>
             <h1>${esc(publico.nome || "Cardápio")}</h1>
-            <p>${esc([publico.endereco, mesa ? `Mesa ${mesa}` : "Retirada no balcão"].filter(Boolean).join(" · "))}</p>
+            ${publico.endereco ? `<p class="store-end">${esc(publico.endereco)}</p>` : ""}
           </div>
           <div class="store-tools">
-            <button type="button" class="icon-btn" id="btn-busca" aria-label="Buscar">🔍</button>
-            ${wa ? `<a class="icon-btn wa" href="${esc(wa)}" target="_blank" rel="noopener" aria-label="WhatsApp">💬</a>` : ""}
+            <button type="button" class="icon-btn" id="btn-busca" aria-label="Buscar">${ico.search}</button>
+            ${wa ? `<a class="icon-btn wa" href="${esc(wa)}" target="_blank" rel="noopener" aria-label="WhatsApp">${ico.wa}</a>` : ""}
           </div>
         </div>
-        ${aberto ? `
-          <div class="store-chips">
-            ${publico.entregaTexto ? `<span>Entrega<br><strong>${esc(publico.entregaTexto)}</strong></span>` : ""}
-            ${publico.pedidoMinimoTexto ? `<span>Pedido mínimo<br><strong>${esc(publico.pedidoMinimoTexto)}</strong></span>` : ""}
-          </div>` : ""}
+        <div class="store-sub">
+          <span class="canal ${mesa ? "mesa" : "retirada"}">${esc(canal)}</span>
+          ${aberto && publico.entregaTexto ? `<span class="chip-info">${esc(publico.entregaTexto)}</span>` : ""}
+          ${aberto && publico.pedidoMinimoTexto ? `<span class="chip-info">${esc(publico.pedidoMinimoTexto)}</span>` : ""}
+        </div>
         ${extra}
       </header>
     `;
@@ -273,17 +277,17 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   function cardProduto(p, destaque) {
     const foto = p.fotoUrl
       ? `<img src="${esc(p.fotoUrl)}" alt="">`
-      : `<div class="ph">${esc(iconeCategoria(p.categoria))}</div>`;
+      : `<div class="ph">${ico.photo}</div>`;
     return `
       <article class="${destaque ? "spot-card" : "menu-item"}" data-open="${esc(p.id)}" role="button" tabindex="0">
-        ${destaque ? foto : ""}
+        ${destaque ? `<div class="spot-media">${foto}</div>` : ""}
         <div class="menu-copy">
           ${p.destaque && !destaque ? `<em class="fav">Mais pedido</em>` : ""}
-          <h3>${esc(p.nome)}${p.idade18 ? ` <span class="tag-18">18+</span>` : ""}</h3>
+          <h3>${esc(p.nome)}</h3>
           ${p.descricao ? `<p>${esc(p.descricao)}</p>` : ""}
           <strong>${esc(rotuloPreco(p))}</strong>
         </div>
-        ${destaque ? "" : foto}
+        ${destaque ? "" : `<div class="menu-media">${foto}<span class="add-dot">${ico.plus}</span></div>`}
       </article>
     `;
   }
@@ -305,7 +309,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
             </div>` : "")}
           ${!q && cats.length ? `
             <nav class="cats" aria-label="Categorias">
-              ${cats.map((c) => `<a href="#${idCategoria(c)}">${esc(iconeCategoria(c))} ${esc(c)}</a>`).join("")}
+              ${cats.map((c) => `<a href="#${idCategoria(c)}">${esc(c)}</a>`).join("")}
             </nav>` : ""}
           ${!q && destaques.length ? `
             <section class="spot-wrap">
@@ -320,7 +324,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
               const itens = lista.filter((p) => (p.categoria || "Geral") === c);
               return `
                 <section class="menu-sec" id="${idCategoria(c)}">
-                  <h2 class="sec-title">${esc(iconeCategoria(c))} ${esc(c)}</h2>
+                  <h2 class="sec-title">${esc(c)}</h2>
                   ${itens.map((p) => cardProduto(p, false)).join("")}
                 </section>`;
             }).join("")}
@@ -346,7 +350,10 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       <div class="sheet" id="sheet">
         <div class="sheet-card">
           <div class="sheet-grab"></div>
-          <h2>Seu pedido</h2>
+          <header class="sheet-head">
+            <h2>Seu pedido</h2>
+            <p>${mesa ? `Mesa ${esc(String(mesa))}` : "Retirada no balcão"}</p>
+          </header>
           ${carrinho.map((i) => {
             const p = produtos.find((x) => String(x.id) === String(i.id));
             const extra = textoExtras(i.extras);
@@ -407,10 +414,10 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     app.innerHTML = `
       <div class="menu-frame">
         <div class="prod-page">
-          <button type="button" class="icon-btn back-float" id="btn-voltar" aria-label="Voltar">←</button>
-          ${prod.fotoUrl ? `<img class="prod-hero" src="${esc(prod.fotoUrl)}" alt="">` : `<div class="prod-hero ph-hero">${esc(iconeCategoria(prod.categoria))}</div>`}
+          <button type="button" class="icon-btn back-float" id="btn-voltar" aria-label="Voltar">${ico.back}</button>
+          ${prod.fotoUrl ? `<img class="prod-hero" src="${esc(prod.fotoUrl)}" alt="">` : `<div class="prod-hero ph-hero">${ico.photo}</div>`}
           <div class="prod-body">
-            <p class="prod-cat">${esc(prod.categoria || "")}${prod.idade18 ? " · 18+" : ""}</p>
+            <p class="prod-cat">${esc(prod.categoria || "")}</p>
             <h1>${esc(prod.nome)}</h1>
             ${prod.descricao ? `<p class="prod-desc">${esc(prod.descricao)}</p>` : ""}
             <p class="prod-from">${mostraAPartirDe(prod) ? "A partir de " : ""}${brl(precoMinimo(prod))}</p>
@@ -439,7 +446,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
                           <em>${o.preco ? `+ ${brl(o.preco)}` : "Incluso"}</em>
                         </div>
                         ${g.tipo === "single"
-                          ? `<button type="button" class="opt-radio ${on ? "on" : ""}" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-single="${on ? 0 : 1}">${on ? "●" : "○"}</button>`
+                          ? `<button type="button" class="opt-radio ${on ? "on" : ""}" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-single="${on ? 0 : 1}" aria-label="${esc(o.nome)}"></button>`
                           : `<div class="qty mini">
                               <button type="button" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-q="${n - 1}">−</button>
                               <span>${n}</span>

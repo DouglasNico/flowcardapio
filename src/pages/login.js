@@ -1,6 +1,7 @@
 import { loginGestor } from "../lib/auth.js";
 import { soNumeroChave } from "../lib/chave.js";
 import { erroAmigavel } from "../lib/format.js";
+import { ico } from "../lib/icons.js";
 
 export function renderLogin(app) {
   document.body.className = "is-painel";
@@ -8,8 +9,8 @@ export function renderLogin(app) {
     <main class="login-page">
       <form class="login-card" id="form-login">
         <img src="/logos/FlowPDV-vertical-escuro.png" alt="FlowPDV">
-        <h1>Cardápio <span>online</span></h1>
-        <p class="sub">Entre com a chave e a senha do gestor</p>
+        <h1>Painel do <span>cardápio</span></h1>
+        <p class="sub">Entre com a chave da loja e a senha do gestor</p>
         <div class="login-error" id="login-error"></div>
         <div class="field">
           <label for="login-chave">Chave da licença</label>
@@ -22,7 +23,7 @@ export function renderLogin(app) {
           <label for="login-pin">Senha do gestor</label>
           <div class="pin-wrap">
             <input id="login-pin" type="password" required maxlength="8" autocomplete="current-password" placeholder="••••">
-            <button type="button" id="btn-ver-pin" aria-label="Mostrar senha">👁️</button>
+            <button type="button" id="btn-ver-pin" aria-label="Mostrar senha">${ico.eye}</button>
           </div>
         </div>
         <label class="remember"><input type="checkbox" id="login-lembrar" checked> Manter conectado</label>

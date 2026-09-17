@@ -99,7 +99,6 @@ export async function publicarCardapio(chave) {
       fotoUrl: String(ov.fotoUrl || ""),
       esgotado: Boolean(ov.esgotado),
       destaque: Boolean(ov.destaque),
-      idade18: Boolean(ov.idade18),
       grupos: sanitizarGrupos(ov.grupos),
       unidade: String(p.unidade || p.un || "UN")
     });
