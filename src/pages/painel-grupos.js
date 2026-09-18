@@ -1,5 +1,5 @@
 import { esc, toast } from "../lib/format.js";
-import { novoId, sanitizarGrupos } from "../lib/grupos.js";
+import { novoId, sanitizarGrupos, ordenarGrupos } from "../lib/grupos.js";
 import { precoProduto } from "../lib/backup.js";
 
 const TEMPLATES = [
@@ -77,6 +77,7 @@ function grupoVazio(extra = {}) {
 export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose }) {
   let grupos = JSON.parse(JSON.stringify((overlay && overlay.grupos) || []));
   if (!Array.isArray(grupos)) grupos = [];
+  grupos = ordenarGrupos(grupos);
 
   const wrap = document.createElement("div");
   wrap.className = "modal";
@@ -281,8 +282,11 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
   wrap.querySelectorAll("[data-tpl]").forEach((btn) => {
     btn.addEventListener("click", () => {
       lerCampos();
-      grupos.push(grupoVazio(TEMPLATES[Number(btn.dataset.tpl)]));
-      pintarGrupos({ gi: grupos.length - 1 });
+      const tpl = TEMPLATES[Number(btn.dataset.tpl)];
+      grupos.push(grupoVazio(tpl));
+      grupos = ordenarGrupos(grupos);
+      const gi = grupos.findIndex((g) => g.nome === (tpl && tpl.nome));
+      pintarGrupos({ gi: gi < 0 ? grupos.length - 1 : gi });
     });
   });
   wrap.querySelector("#ed-salvar").addEventListener("click", async () => {

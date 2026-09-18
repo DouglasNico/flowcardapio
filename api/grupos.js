@@ -1,6 +1,6 @@
 export function sanitizarGrupos(grupos) {
   if (!Array.isArray(grupos)) return [];
-  return grupos.slice(0, 16).map((g, gi) => {
+  const limpos = grupos.slice(0, 16).map((g, gi) => {
     const tipo = String(g && g.tipo) === "single" ? "single" : "multi";
     let min = Math.max(0, Math.min(20, parseInt(g && g.min, 10) || 0));
     let max = Math.max(0, Math.min(20, parseInt(g && g.max, 10) || 0));
@@ -26,6 +26,35 @@ export function sanitizarGrupos(grupos) {
       opcoes
     };
   }).filter((g) => g.nome && g.opcoes.length);
+  return ordenarGrupos(limpos);
+}
+
+function chaveGrupo(nome) {
+  return String(nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function pesoGrupo(nome) {
+  const n = chaveGrupo(nome);
+  if (n.includes("combo")) return 10;
+  if (n.includes("ponto")) return 20;
+  if (n.includes("molho")) return 30;
+  if (n.includes("adicional")) return 40;
+  return 80;
+}
+
+function ordenarGrupos(grupos) {
+  return grupos
+    .map((g, i) => ({ g, i }))
+    .sort((a, b) => {
+      const da = pesoGrupo(a.g && a.g.nome);
+      const db = pesoGrupo(b.g && b.g.nome);
+      return da - db || a.i - b.i;
+    })
+    .map((x) => x.g);
 }
 
 function acharOpcao(prod, grupoId, opcaoId) {
