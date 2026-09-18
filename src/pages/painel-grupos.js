@@ -42,6 +42,7 @@ const TEMPLATES = [
     min: 0,
     max: 1,
     precoGrupo: 12,
+    inclusoNome: "Batata frita",
     opcoes: [
       { nome: "Refrigerante lata", preco: 0 }
     ]
@@ -68,6 +69,7 @@ function grupoVazio(extra = {}) {
     min: extra.min != null ? extra.min : 0,
     max: extra.max != null ? extra.max : 6,
     precoGrupo: Number(extra.precoGrupo) || 0,
+    inclusoNome: extra.inclusoNome || "",
     opcoes
   };
 }
@@ -97,6 +99,7 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
       grupos[gi].min = obrEl && obrEl.checked ? 1 : 0;
       grupos[gi].max = grupos[gi].tipo === "single" ? 1 : 6;
       grupos[gi].precoGrupo = Number((sec.querySelector("[data-gpreco]") || {}).value) || 0;
+      grupos[gi].inclusoNome = String((sec.querySelector("[data-incluso]") || {}).value || "").trim();
       grupos[gi].opcoes = [...sec.querySelectorAll(".ed-opt")].map((row) => ({
         id: (grupos[gi].opcoes && grupos[gi].opcoes[Number(row.dataset.oi)] && grupos[gi].opcoes[Number(row.dataset.oi)].id) || novoId("o"),
         nome: (row.querySelector("[data-onome]") || {}).value || "",
@@ -127,11 +130,14 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
             <input type="checkbox" data-obr ${g.min > 0 ? "checked" : ""}>
             Obrigatório
           </label>
-          <label>Acréscimo do grupo (R$)
+          <label>Extra do combo (R$)
             <input type="number" step="0.01" min="0" data-gpreco value="${g.precoGrupo || 0}">
           </label>
+          <label>O que entra nesse extra
+            <input data-incluso placeholder="Batata frita" value="${esc(g.inclusoNome || "")}">
+          </label>
         </div>
-        <p class="ed-hint">Combo: põe o valor aqui (ex. 12) e puxa as bebidas incluso. Copia só o nome — não vende a categoria Bebidas nem usa o preço do PDV.</p>
+        <p class="ed-hint">Combo: o extra (batata) soma 1 vez + o preço da bebida escolhida. Não mexe no PDV. Puxar com preço copia só o valor do refri.</p>
         ${(g.opcoes || []).map((o, oi) => `
           <div class="ed-opt" data-oi="${oi}">
             <input data-onome placeholder="Nome da opção" value="${esc(o.nome || "")}">

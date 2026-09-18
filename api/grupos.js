@@ -22,6 +22,7 @@ export function sanitizarGrupos(grupos) {
       max,
       tipo,
       precoGrupo: Math.max(0, Math.round((Number(g && g.precoGrupo) || 0) * 100) / 100),
+      inclusoNome: String((g && g.inclusoNome) || "").trim().slice(0, 40),
       opcoes
     };
   }).filter((g) => g.nome && g.opcoes.length);

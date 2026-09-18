@@ -70,8 +70,7 @@ function acaoStatus(status) {
 const COLUNAS = [
   { id: "novo", label: "Novos" },
   { id: "em_preparo", label: "Em preparo" },
-  { id: "pronto", label: "Prontos" },
-  { id: "entregue", label: "Entregues" }
+  { id: "pronto", label: "Prontos" }
 ];
 
 export async function renderPainel(app, sessao) {
@@ -87,6 +86,7 @@ export async function renderPainel(app, sessao) {
   let conhecidos = new Set();
   let primeiroSnap = true;
   let assinaturaPedidos = "";
+  let vistaPedidos = "cozinha";
 
   app.innerHTML = `
     <div class="painel-shell">
@@ -511,9 +511,9 @@ export async function renderPainel(app, sessao) {
       conhecidos = new Set(lista.map((p) => p.id));
       primeiroSnap = false;
       pedidos = lista;
-      const sig = lista.map((p) => `${p.id}:${p.status}:${p.atualizadoEm || ""}`).join("|");
+      const sig = lista.map((p) => `${p.id}:${p.status}:${p.atualizadoEm || ""}`).join("|") + `:${vistaPedidos}`;
       if (aba === "pedidos" && sig !== assinaturaPedidos) pintarPedidos();
-      else assinaturaPedidos = sig;
+      else if (aba !== "pedidos") assinaturaPedidos = sig;
     }, (err) => {
       if (aba === "pedidos") main.innerHTML = `<p class="empty">${erroAmigavel(err)}</p>`;
     });
@@ -554,7 +554,9 @@ export async function renderPainel(app, sessao) {
 
   function pintarPedidos() {
     garantirPedidos();
-    assinaturaPedidos = pedidos.map((p) => `${p.id}:${p.status}:${p.atualizadoEm || ""}`).join("|");
+    const vivos = pedidos.filter((p) => p.status !== "entregue" && p.status !== "cancelado");
+    const feitos = pedidos.filter((p) => p.status === "entregue" || p.status === "cancelado");
+    assinaturaPedidos = pedidos.map((p) => `${p.id}:${p.status}:${p.atualizadoEm || ""}`).join("|") + `:${vistaPedidos}`;
     main.classList.add("wide");
     if (!pedidos.length) {
       main.innerHTML = `<div class="empty-card"><h2>Nenhum pedido ainda</h2><p>Publique o cardápio e teste o QR da mesa ou o link de ${CANAL_LOJA.toLowerCase()}.</p></div>`;
@@ -563,11 +565,9 @@ export async function renderPainel(app, sessao) {
     const por = {
       novo: pedidos.filter((p) => p.status === "novo"),
       em_preparo: pedidos.filter((p) => p.status === "em_preparo"),
-      pronto: pedidos.filter((p) => p.status === "pronto"),
-      entregue: pedidos.filter((p) => p.status === "entregue" || p.status === "cancelado")
+      pronto: pedidos.filter((p) => p.status === "pronto")
     };
-    main.innerHTML = `
-      <section class="page-head"><div><h2>Pedidos ao vivo</h2><p>Kanban da cozinha. Novos pedidos avisam com um som.</p></div></section>
+    const cozinha = `
       <div class="kanban">
         ${COLUNAS.map((col) => {
           const lista = por[col.id] || [];
@@ -582,8 +582,29 @@ export async function renderPainel(app, sessao) {
               </div>
             </section>`;
         }).join("")}
-      </div>
+      </div>`;
+    const historico = feitos.length
+      ? `<div class="hist-list">${feitos.map((p) => htmlCardPedido(p)).join("")}</div>`
+      : `<div class="empty-card"><h2>Nenhum entregue ainda</h2><p>Quando marcar Entregar, o pedido vem para cá.</p></div>`;
+    main.innerHTML = `
+      <section class="page-head">
+        <div>
+          <h2>Pedidos</h2>
+          <p>${vistaPedidos === "entregues" ? "Histórico de entregues e cancelados." : "Kanban da cozinha. Novos avisam com um som."}</p>
+        </div>
+        <div class="subtabs">
+          <button type="button" data-vista="cozinha" class="${vistaPedidos === "cozinha" ? "on" : ""}">Cozinha <em>${vivos.length}</em></button>
+          <button type="button" data-vista="entregues" class="${vistaPedidos === "entregues" ? "on" : ""}">Entregues <em>${feitos.length}</em></button>
+        </div>
+      </section>
+      ${vistaPedidos === "entregues" ? historico : cozinha}
     `;
+    main.querySelectorAll("[data-vista]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        vistaPedidos = btn.dataset.vista;
+        pintarPedidos();
+      });
+    });
     main.querySelectorAll("[data-st]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
@@ -593,6 +614,7 @@ export async function renderPainel(app, sessao) {
           p.status = st;
           p.atualizadoEm = new Date().toISOString();
         }
+        if (st === "entregue" || st === "cancelado") vistaPedidos = "cozinha";
         btn.disabled = true;
         pintarPedidos();
         try {
