@@ -21,6 +21,7 @@ export function sanitizarGrupos(grupos) {
       min,
       max,
       tipo,
+      precoGrupo: Math.max(0, Math.round((Number(g && g.precoGrupo) || 0) * 100) / 100),
       opcoes
     };
   }).filter((g) => g.nome && g.opcoes.length);
@@ -78,6 +79,21 @@ export function validarExtras(prod, extrasIn) {
     }
   }
   return resolvidos;
+}
+
+export function totalExtrasLinha(prod, extras) {
+  let total = 0;
+  const cobrou = new Set();
+  const grupos = sanitizarGrupos(prod && prod.grupos);
+  for (const e of extras || []) {
+    total += (Number(e.preco) || 0) * (Number(e.quantidade) || 1);
+    const g = grupos.find((x) => String(x.id) === String(e.grupoId));
+    if (g && g.precoGrupo && !cobrou.has(g.id)) {
+      total += g.precoGrupo;
+      cobrou.add(g.id);
+    }
+  }
+  return total;
 }
 
 export function textoExtras(extras) {

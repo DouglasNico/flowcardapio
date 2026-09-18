@@ -6,7 +6,7 @@ import {
   preflight,
   senhaDaLoja
 } from "./_lib.js";
-import { textoExtras, validarExtras } from "./grupos.js";
+import { textoExtras, totalExtrasLinha, validarExtras } from "./grupos.js";
 
 const PROJECT = firebaseConfig.projectId;
 const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
@@ -149,7 +149,7 @@ export default async function handler(req, res) {
       } catch (err) {
         return json(res, err.status || 400, { error: err.message || "Opções inválidas." });
       }
-      const extrasTotal = extras.reduce((s, e) => s + (Number(e.preco) || 0) * (Number(e.quantidade) || 1), 0);
+      const extrasTotal = totalExtrasLinha(prod, extras);
       const preco = Number(prod.preco) || 0;
       const precoUnitario = preco + extrasTotal;
       const observacao = String((raw && raw.observacao) || "").slice(0, 180);

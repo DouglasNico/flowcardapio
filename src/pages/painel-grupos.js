@@ -41,8 +41,9 @@ const TEMPLATES = [
     tipo: "single",
     min: 0,
     max: 1,
+    precoGrupo: 12,
     opcoes: [
-      { nome: "Batata + refrigerante", preco: 12 }
+      { nome: "Refrigerante lata", preco: 0 }
     ]
   }
 ];
@@ -66,6 +67,7 @@ function grupoVazio(extra = {}) {
     tipo: extra.tipo || "multi",
     min: extra.min != null ? extra.min : 0,
     max: extra.max != null ? extra.max : 6,
+    precoGrupo: Number(extra.precoGrupo) || 0,
     opcoes
   };
 }
@@ -94,6 +96,7 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
       grupos[gi].tipo = tipoEl ? tipoEl.value : grupos[gi].tipo;
       grupos[gi].min = obrEl && obrEl.checked ? 1 : 0;
       grupos[gi].max = grupos[gi].tipo === "single" ? 1 : 6;
+      grupos[gi].precoGrupo = Number((sec.querySelector("[data-gpreco]") || {}).value) || 0;
       grupos[gi].opcoes = [...sec.querySelectorAll(".ed-opt")].map((row) => ({
         id: (grupos[gi].opcoes && grupos[gi].opcoes[Number(row.dataset.oi)] && grupos[gi].opcoes[Number(row.dataset.oi)].id) || novoId("o"),
         nome: (row.querySelector("[data-onome]") || {}).value || "",
@@ -124,7 +127,11 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
             <input type="checkbox" data-obr ${g.min > 0 ? "checked" : ""}>
             Obrigatório
           </label>
+          <label>Acréscimo do grupo (R$)
+            <input type="number" step="0.01" min="0" data-gpreco value="${g.precoGrupo || 0}">
+          </label>
         </div>
+        <p class="ed-hint">Combo: põe o valor aqui (ex. 12) e puxa as bebidas incluso. Copia só o nome — não vende a categoria Bebidas nem usa o preço do PDV.</p>
         ${(g.opcoes || []).map((o, oi) => `
           <div class="ed-opt" data-oi="${oi}">
             <input data-onome placeholder="Nome da opção" value="${esc(o.nome || "")}">
@@ -135,7 +142,9 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
         <div class="ed-opt-actions">
           <button type="button" class="btn-ghost" data-add-o>+ Opção</button>
           <button type="button" class="btn-ghost" data-imp="adicion">Puxar Adicionais do PDV</button>
-          <button type="button" class="btn-ghost" data-imp="bebida">Puxar Bebidas do PDV</button>
+          <button type="button" class="btn-ghost" data-imp="bebida0">Puxar Bebidas incluso</button>
+          <button type="button" class="btn-ghost" data-imp="bebida">Puxar Bebidas com preço</button>
+          <button type="button" class="btn-ghost" data-zero>Zerar preços</button>
         </div>
       </section>
     `).join("");
@@ -173,6 +182,7 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
         btn.addEventListener("click", () => {
           lerCampos();
           const key = btn.dataset.imp;
+          const incluso = key === "bebida0";
           const hits = (produtos || []).filter((p) => {
             const c = String(p.categoria || "").toLowerCase();
             if (key === "adicion") return /adicion|extra|complem/.test(c);
@@ -183,16 +193,33 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
             return;
           }
           grupos[gi].opcoes = grupos[gi].opcoes || [];
+          const ja = new Set(grupos[gi].opcoes.map((o) => String(o.nome || "").toLowerCase()));
+          let n = 0;
           hits.forEach((p) => {
+            const nome = String(p.nome || "").trim();
+            if (!nome || ja.has(nome.toLowerCase())) return;
+            ja.add(nome.toLowerCase());
             grupos[gi].opcoes.push(opcaoVazia({
-              nome: p.nome,
-              preco: precoProduto(p)
+              nome,
+              preco: incluso ? 0 : precoProduto(p)
             }));
+            n += 1;
           });
-          toast(`${hits.length} itens puxados do PDV.`);
+          toast(incluso
+            ? `${n} bebidas inclusas no extra. Não entram na categoria Bebidas.`
+            : `${n} itens com o preço do PDV.`);
           pintarGrupos({ gi, ultimo: true });
         });
       });
+      const zero = sec.querySelector("[data-zero]");
+      if (zero) {
+        zero.addEventListener("click", () => {
+          lerCampos();
+          (grupos[gi].opcoes || []).forEach((o) => { o.preco = 0; });
+          toast("Preços deste grupo zerados. Ficam inclusos no extra.");
+          pintarGrupos({ gi });
+        });
+      }
       sec.querySelectorAll("[data-del-o]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const row = btn.closest(".ed-opt");

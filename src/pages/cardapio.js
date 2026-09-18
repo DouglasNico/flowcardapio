@@ -76,6 +76,9 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   let sheetAberto = false;
   let animarItem = Boolean(itemId);
   let fechandoItem = false;
+  let grupoAberto = null;
+  let catAtiva = "";
+  let pularScroll = false;
   let rascunho = novoRascunho();
   const wa = linkWhatsapp(
     publico && publico.whatsapp,
@@ -83,7 +86,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   );
 
   function novoRascunho() {
-    return { qtd: 1, obs: "", extras: [] };
+    return { qtd: 1, obs: "", extras: [], ativos: {} };
   }
 
   function pathLista() {
@@ -116,6 +119,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     sheetAberto = false;
     animarItem = !reduzMovimento();
     fechandoItem = false;
+    grupoAberto = null;
     const url = pathItem(id);
     if (location.pathname !== url) history.pushState({}, "", url);
     pintar();
@@ -146,7 +150,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     concluir();
   }
 
-  function setExtra(grupo, opcao, nextQtd) {
+  function setExtra(grupo, opcao, nextQtd, grupos) {
     let extras = [...rascunho.extras];
     if (grupo.tipo === "single") {
       extras = extras.filter((e) => String(e.grupoId) !== String(grupo.id));
@@ -158,6 +162,12 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
           nome: opcao.nome,
           preco: opcao.preco
         });
+        rascunho.ativos[grupo.id] = true;
+        const lista = grupos || sanitizarGrupos((prodAtual() || {}).grupos);
+        const i = lista.findIndex((x) => String(x.id) === String(grupo.id));
+        const prox = i >= 0 ? lista[i + 1] : null;
+        grupoAberto = prox ? prox.id : grupo.id;
+        pularScroll = true;
       }
       rascunho.extras = extras;
       pintar();
@@ -339,7 +349,11 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         </div>` : "",
       cats.length > 1 ? `
         <nav class="cats" aria-label="Categorias">
-          ${cats.map((c, i) => `<a href="#${idCategoria(c)}" class="${i === 0 ? "on" : ""}">${esc(c)}</a>`).join("")}
+          ${cats.map((c, i) => {
+            const id = idCategoria(c);
+            const on = catAtiva ? catAtiva === id : i === 0;
+            return `<button type="button" class="${on ? "on" : ""}" data-cat="${id}">${esc(c)}</button>`;
+          }).join("")}
         </nav>` : ""
     ].join("");
 
@@ -442,10 +456,20 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const grupos = sanitizarGrupos(prod.grupos);
     const unit = precoLinha(prod, rascunho.extras, 1);
     const tot = unit * rascunho.qtd;
+    const precisa = (g) => (g.min > 0 ? g.min : (rascunho.ativos[g.id] ? 1 : 0));
+    const pendente = grupos.find((g) => qtdNoGrupo(rascunho.extras, g.id) < precisa(g));
     let pode = true;
     let motivo = "";
     try { validarExtras(prod, rascunho.extras); }
     catch (err) { pode = false; motivo = err.message; }
+    if (pode && pendente) {
+      pode = false;
+      motivo = precisa(pendente) === 1
+        ? `Escolha uma opção em ${pendente.nome}.`
+        : `Escolha ${precisa(pendente)} opções em ${pendente.nome}.`;
+    }
+    if (!grupoAberto) grupoAberto = pendente ? pendente.id : (grupos[0] && grupos[0].id);
+    const foco = String(grupoAberto || "");
     const prev = app.querySelector(".prod-page");
     const y = prev ? prev.scrollTop : 0;
     const entrar = animarItem && !reduzMovimento();
@@ -464,52 +488,61 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
               <p class="prod-from">${mostraAPartirDe(prod) ? "A partir de " : ""}${brl(precoMinimo(prod))}</p>
               ${grupos.length ? grupos.map((g) => {
                 const usados = qtdNoGrupo(rascunho.extras, g.id);
+                const opcional = g.min <= 0;
+                const ativo = !opcional || Boolean(rascunho.ativos[g.id]);
+                const aberto = String(g.id) === foco && ativo;
+                const falta = usados < precisa(g);
+                const escolhida = (g.opcoes.find((o) => qtdOpcao(rascunho.extras, g.id, o.id) > 0) || {}).nome;
                 const q = buscaExtra.trim().toLowerCase();
                 const ops = q ? g.opcoes.filter((o) => `${o.nome} ${o.descricao || ""}`.toLowerCase().includes(q)) : g.opcoes;
-                const regra = g.tipo === "single"
-                  ? (g.min ? "Obrigatório · escolha 1" : "Escolha 1")
-                  : `${g.min ? `Mín. ${g.min} · ` : ""}até ${g.max || "livre"} · ${usados}/${g.max || "—"}`;
+                let regra = opcional && !ativo ? "Desativado" : (escolhida || (g.tipo === "single" ? "Escolha 1" : `${usados}/${g.max || "—"}`));
+                if (g.precoGrupo) regra = ativo ? `${regra} · + ${brl(g.precoGrupo)}` : `+ ${brl(g.precoGrupo)}`;
+                if (falta) regra = g.min > 0 || ativo ? "Obrigatório · escolha 1" : regra;
                 return `
-                  <section class="opt-group">
+                  <section class="opt-group${aberto ? " open" : ""}${falta ? " need" : ""}">
                     <header>
-                      <h2>${esc(g.nome)}</h2>
-                      <small>${esc(regra)}</small>
+                      ${opcional ? `<button type="button" class="opt-check${ativo ? " on" : ""}" data-toggle-g="${esc(g.id)}" aria-label="${ativo ? "Desativar" : "Ativar"} ${esc(g.nome)}"></button>` : ""}
+                      <button type="button" class="opt-head" data-open-g="${esc(g.id)}">
+                        <h2>${esc(g.nome)}</h2>
+                        <small>${esc(regra)}</small>
+                      </button>
                     </header>
-                    ${g.opcoes.length > 16 ? `<input type="search" class="opt-search" placeholder="Pesquisar em ${esc(g.nome)}" value="${esc(buscaExtra)}">` : ""}
-                    ${ops.map((o) => {
-                      const n = qtdOpcao(rascunho.extras, g.id, o.id);
-                      const on = n > 0;
-                      return `
-                        <div class="opt-row ${on ? "on" : ""}">
-                          <div>
-                            <strong>${esc(o.nome)}</strong>
-                            ${o.descricao ? `<small>${esc(o.descricao)}</small>` : ""}
-                            <em>${o.preco ? `+ ${brl(o.preco)}` : "Incluso"}</em>
-                          </div>
-                          ${g.tipo === "single"
-                            ? `<button type="button" class="opt-radio ${on ? "on" : ""}" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-single="${on ? 0 : 1}" aria-label="${esc(o.nome)}"></button>`
-                            : `<div class="qty mini">
-                                <button type="button" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-q="${n - 1}">−</button>
-                                <span>${n}</span>
-                                <button type="button" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-q="${n + 1}">+</button>
-                              </div>`}
-                        </div>`;
-                    }).join("") || `<p class="empty">Nenhuma opção nesta busca.</p>`}
+                    ${aberto ? `
+                      ${g.opcoes.length > 16 ? `<input type="search" class="opt-search" placeholder="Pesquisar em ${esc(g.nome)}" value="${esc(buscaExtra)}">` : ""}
+                      ${ops.map((o) => {
+                        const n = qtdOpcao(rascunho.extras, g.id, o.id);
+                        const on = n > 0;
+                        return `
+                          <div class="opt-row ${on ? "on" : ""}">
+                            <div>
+                              <strong>${esc(o.nome)}</strong>
+                              ${o.descricao ? `<small>${esc(o.descricao)}</small>` : ""}
+                              <em>${o.preco ? `+ ${brl(o.preco)}` : (g.precoGrupo ? "Incluso no extra" : "Incluso")}</em>
+                            </div>
+                            ${g.tipo === "single"
+                              ? `<button type="button" class="opt-radio ${on ? "on" : ""}" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-single="${on ? 0 : 1}" aria-label="${esc(o.nome)}"></button>`
+                              : `<div class="qty mini">
+                                  <button type="button" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-q="${n - 1}">−</button>
+                                  <span>${n}</span>
+                                  <button type="button" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-q="${n + 1}">+</button>
+                                </div>`}
+                          </div>`;
+                      }).join("") || `<p class="empty">Nenhuma opção nesta busca.</p>`}
+                    ` : ""}
                   </section>`;
               }).join("") : ""}
-              <section class="opt-group">
+              <section class="opt-group open">
                 <header><h2>Observações</h2><small>Opcional</small></header>
                 <textarea class="obs" id="obs-item" maxlength="180" placeholder="Ex.: sem cebola, ponto da carne, sem picles">${esc(rascunho.obs)}</textarea>
               </section>
             </div>
             <div class="prod-footer">
-              ${!pode && motivo ? `<p class="prod-hint">${esc(motivo)}</p>` : ""}
               <div class="qty">
                 <button type="button" id="qtd-menos">−</button>
                 <span>${rascunho.qtd}</span>
                 <button type="button" id="qtd-mais">+</button>
               </div>
-              <button class="btn-primary" id="btn-add" type="button" ${pode ? "" : "disabled"}>
+              <button class="btn-primary${pode ? "" : " is-off"}" id="btn-add" type="button">
                 Adicionar ${brl(tot)}
               </button>
             </div>
@@ -519,7 +552,14 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     `;
 
     const page = app.querySelector(".prod-page");
-    if (page) page.scrollTop = y;
+    if (page && !pularScroll) page.scrollTop = y;
+    if (pularScroll) {
+      pularScroll = false;
+      requestAnimationFrame(() => {
+        const el = app.querySelector(`[data-open-g="${foco}"]`);
+        if (el) el.scrollIntoView({ block: "nearest", behavior: reduzMovimento() ? "auto" : "smooth" });
+      });
+    }
     app.querySelector("#prod-overlay").addEventListener("click", (ev) => {
       if (ev.target.id === "prod-overlay") fecharItem();
     });
@@ -538,16 +578,55 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     app.querySelectorAll(".opt-search").forEach((el) => {
       el.addEventListener("input", () => { buscaExtra = el.value; pintar(); });
     });
+    app.querySelectorAll("[data-toggle-g]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const id = btn.dataset.toggleG;
+        if (rascunho.ativos[id]) {
+          delete rascunho.ativos[id];
+          rascunho.extras = rascunho.extras.filter((e) => String(e.grupoId) !== String(id));
+          grupoAberto = null;
+        } else {
+          rascunho.ativos[id] = true;
+          grupoAberto = id;
+        }
+        pintar();
+      });
+    });
+    app.querySelectorAll("[data-open-g]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.openG;
+        const g = grupos.find((x) => String(x.id) === String(id));
+        if (g && g.min <= 0) rascunho.ativos[id] = true;
+        grupoAberto = id;
+        pintar();
+      });
+    });
     app.querySelectorAll("[data-g][data-o]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const g = grupos.find((x) => String(x.id) === String(btn.dataset.g));
         const o = g && g.opcoes.find((x) => String(x.id) === String(btn.dataset.o));
         if (!g || !o) return;
-        if (btn.dataset.single != null) setExtra(g, o, Number(btn.dataset.single));
-        else setExtra(g, o, Number(btn.dataset.q));
+        if (btn.dataset.single != null) setExtra(g, o, Number(btn.dataset.single), grupos);
+        else setExtra(g, o, Number(btn.dataset.q), grupos);
       });
     });
-    app.querySelector("#btn-add").addEventListener("click", adicionarAoPedido);
+    app.querySelector("#btn-add").addEventListener("click", () => {
+      if (!pode) {
+        if (pendente) {
+          grupoAberto = pendente.id;
+          if (pendente.min <= 0) rascunho.ativos[pendente.id] = true;
+          pintar();
+          requestAnimationFrame(() => {
+            const el = app.querySelector(`[data-open-g="${pendente.id}"]`);
+            if (el) el.scrollIntoView({ block: "center", behavior: reduzMovimento() ? "auto" : "smooth" });
+          });
+        }
+        toast(motivo || "Complete as opções do item.");
+        return;
+      }
+      adicionarAoPedido();
+    });
   }
 
   function bindLista() {
@@ -568,9 +647,12 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         pintar();
       });
     }
-    app.querySelectorAll(".cats a").forEach((a) => {
-      a.addEventListener("click", () => {
-        app.querySelectorAll(".cats a").forEach((x) => x.classList.toggle("on", x === a));
+    app.querySelectorAll("[data-cat]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        catAtiva = btn.dataset.cat;
+        app.querySelectorAll("[data-cat]").forEach((x) => x.classList.toggle("on", x === btn));
+        const alvo = document.getElementById(catAtiva);
+        if (alvo) alvo.scrollIntoView({ behavior: reduzMovimento() ? "auto" : "smooth", block: "start" });
       });
     });
     app.querySelectorAll("[data-open]").forEach((el) => {

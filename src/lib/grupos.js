@@ -25,6 +25,7 @@ export function sanitizarGrupos(grupos) {
       min,
       max,
       tipo,
+      precoGrupo: Math.max(0, Math.round((Number(g && g.precoGrupo) || 0) * 100) / 100),
       opcoes
     };
   }).filter((g) => g.nome && g.opcoes.length);
@@ -39,14 +40,15 @@ export function precoMinimo(prod) {
   for (const g of sanitizarGrupos(prod && prod.grupos)) {
     if (g.min <= 0) continue;
     const sorted = [...g.opcoes].sort((a, b) => a.preco - b.preco);
-    extra += sorted.slice(0, g.min).reduce((s, o) => s + o.preco, 0);
+    extra += g.precoGrupo + sorted.slice(0, g.min).reduce((s, o) => s + o.preco, 0);
   }
   return precoBase(prod) + extra;
 }
 
 export function mostraAPartirDe(prod) {
   return sanitizarGrupos(prod && prod.grupos).some((g) => (
-    g.min > 0 || g.opcoes.some((o) => o.preco > 0)
+    (g.min > 0 && (g.precoGrupo > 0 || g.opcoes.some((o) => o.preco > 0)))
+    || (g.min <= 0 && g.opcoes.some((o) => o.preco > 0))
   ));
 }
 
@@ -73,13 +75,22 @@ export function qtdOpcao(extras, grupoId, opcaoId) {
 
 export function precoExtras(prod, extras) {
   let total = 0;
+  const cobrouGrupo = new Set();
   for (const e of extras || []) {
     const hit = acharOpcao(prod, e.grupoId, e.opcaoId);
     if (!hit) continue;
     const q = Math.max(0, Math.min(99, Number(e.quantidade) || 0));
     total += hit.opcao.preco * q;
+    if (hit.grupo.precoGrupo && !cobrouGrupo.has(hit.grupo.id)) {
+      total += hit.grupo.precoGrupo;
+      cobrouGrupo.add(hit.grupo.id);
+    }
   }
   return total;
+}
+
+export function totalExtrasLinha(prod, extras) {
+  return precoExtras(prod, extras);
 }
 
 export function precoLinha(prod, extras, quantidade) {
