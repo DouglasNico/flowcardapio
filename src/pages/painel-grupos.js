@@ -80,9 +80,13 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
 
   const wrap = document.createElement("div");
   wrap.className = "modal";
+  document.documentElement.classList.add("is-locked");
+  document.body.classList.add("is-locked");
   document.body.appendChild(wrap);
 
   function fechar() {
+    document.documentElement.classList.remove("is-locked");
+    document.body.classList.remove("is-locked");
     wrap.remove();
     if (onClose) onClose();
   }
@@ -130,6 +134,8 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
             <input type="checkbox" data-obr ${g.min > 0 ? "checked" : ""}>
             Obrigatório
           </label>
+        </div>
+        <div class="ed-combo">
           <label>Extra do combo (R$)
             <input type="number" step="0.01" min="0" data-gpreco value="${g.precoGrupo || 0}">
           </label>
@@ -137,7 +143,7 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
             <input data-incluso placeholder="Batata frita" value="${esc(g.inclusoNome || "")}">
           </label>
         </div>
-        <p class="ed-hint">Combo: o extra (batata) soma 1 vez + o preço da bebida escolhida. Não mexe no PDV. Puxar com preço copia só o valor do refri.</p>
+        <p class="ed-hint">O extra (batata) soma 1 vez + o preço da bebida. Não mexe no PDV.</p>
         ${(g.opcoes || []).map((o, oi) => `
           <div class="ed-opt" data-oi="${oi}">
             <input data-onome placeholder="Nome da opção" value="${esc(o.nome || "")}">

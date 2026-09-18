@@ -160,6 +160,8 @@ export async function renderPainel(app, sessao) {
 
   async function onFoto(id, file) {
     if (!file) return;
+    const wrap = main.querySelector(`.prod-card[data-id="${id}"] .thumb-wrap`);
+    if (wrap) wrap.classList.add("is-load");
     try {
       const oldId = overlays[id] && overlays[id].fotoPublicId;
       const assinatura = await assinarUpload(chave, id);
@@ -175,8 +177,9 @@ export async function renderPainel(app, sessao) {
       };
       await salvarOverlay(chave, id, overlays[id]);
       toast("Foto enviada.");
-      pintar();
+      pintarLista();
     } catch (err) {
+      if (wrap) wrap.classList.remove("is-load");
       toast(erroAmigavel(err));
     }
   }
@@ -434,7 +437,12 @@ export async function renderPainel(app, sessao) {
       const foto = ov.fotoUrl ? `<img class="thumb" src="${ov.fotoUrl}" alt="">` : `<div class="thumb">${esc((p.nome || "?").slice(0, 1))}</div>`;
       return `
         <article class="prod-card ${ov.visivel ? "on" : ""}" data-id="${p.id}">
-          ${foto}
+          <div class="thumb-wrap">
+            ${foto}
+            <label class="thumb-hit file-btn">Foto<input type="file" accept="image/jpeg,image/png,image/webp"></label>
+            ${ov.fotoPublicId ? `<button type="button" class="thumb-del" data-del-foto aria-label="Apagar foto">✕</button>` : ""}
+            <span class="thumb-load">Enviando foto...</span>
+          </div>
           <div class="prod-card-body">
             <div class="prod-card-top">
               <h3>${esc(p.nome || "Sem nome")}</h3>
@@ -448,8 +456,6 @@ export async function renderPainel(app, sessao) {
               <label class="chip warn${ov.esgotado ? " on" : ""}"><input type="checkbox" data-esgotado ${ov.esgotado ? "checked" : ""}> Esgotado</label>
             </div>
             <div class="prod-card-actions">
-              <label class="btn-ghost file-btn">Foto<input type="file" accept="image/jpeg,image/png,image/webp"></label>
-              ${ov.fotoPublicId ? `<button type="button" class="btn-ghost" data-del-foto>Apagar foto</button>` : ""}
               <button type="button" class="btn-ghost" data-opcoes>Opções${nOp ? ` (${nOp})` : ""}</button>
             </div>
           </div>
@@ -628,46 +634,105 @@ export async function renderPainel(app, sessao) {
 
   async function pintarQr() {
     const urlLoja = `${originPublico()}/${chave}`;
+    const nome = nomeDaLoja(licenca);
+    const copiar = async (texto) => {
+      try {
+        await navigator.clipboard.writeText(texto);
+        toast("Link copiado.");
+      } catch {
+        toast("Não deu pra copiar o link.");
+      }
+    };
+    const baixar = (dataUrl, arquivo) => {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = arquivo;
+      a.click();
+    };
     main.innerHTML = `
       <section class="page-head">
         <div>
           <h2>QR e links</h2>
-          <p>Cole o QR na mesa. O link da loja é ${CANAL_LOJA}.</p>
+          <p>Imprime o QR da mesa ou o da loja. O cliente abre o cardápio no celular.</p>
         </div>
       </section>
       <div class="qr-grid">
-        <div class="card">
+        <article class="qr-card">
+          <p class="qr-kicker">Salão</p>
           <h3>QR da mesa</h3>
-          <label>Número da mesa</label>
-          <div class="toolbar" style="margin:8px 0 0">
-            <input type="number" id="mesa-n" min="1" value="1">
-            <button class="btn-primary fit" id="btn-qr" type="button">Gerar</button>
+          <p class="qr-lead">Cola na mesa. Já abre o pedido com o número certo.</p>
+          <div class="qr-step">
+            <span>Mesa</span>
+            <div class="qr-stepper">
+              <button type="button" id="mesa-menos" aria-label="Menos">−</button>
+              <input type="number" id="mesa-n" min="1" value="1">
+              <button type="button" id="mesa-mais" aria-label="Mais">+</button>
+            </div>
           </div>
-          <p class="qr-link" id="qr-link"></p>
-        </div>
-        <div class="card qr-preview" id="qr-box"><p class="empty">Gere o QR da mesa.</p></div>
-        <div class="card">
-          <h3>${CANAL_LOJA}</h3>
-          <p class="qr-link">${esc(urlLoja)}</p>
-          <div id="qr-loja"></div>
-        </div>
+          <div class="qr-art" id="qr-mesa-art"></div>
+          <div class="qr-actions">
+            <button type="button" class="btn-ghost" id="qr-mesa-copiar">Copiar link</button>
+            <button type="button" class="btn-primary fit" id="qr-mesa-baixar">Baixar QR</button>
+          </div>
+          <p class="qr-url" id="qr-mesa-url"></p>
+        </article>
+        <article class="qr-card">
+          <p class="qr-kicker">${esc(CANAL_LOJA)}</p>
+          <h3>QR da loja</h3>
+          <p class="qr-lead">Balcão, delivery ou retirada. Sem número de mesa.</p>
+          <div class="qr-step">
+            <span>Canal</span>
+            <span class="qr-pill">${esc(CANAL_LOJA)}</span>
+          </div>
+          <div class="qr-art" id="qr-loja-art"></div>
+          <div class="qr-actions">
+            <button type="button" class="btn-ghost" id="qr-loja-copiar">Copiar link</button>
+            <button type="button" class="btn-primary fit" id="qr-loja-baixar">Baixar QR</button>
+          </div>
+          <p class="qr-url">${esc(urlLoja)}</p>
+        </article>
       </div>
     `;
-    const gerar = async () => {
+    let mesaUrl = "";
+    let mesaQr = "";
+    const gerarMesa = async () => {
       const n = Math.max(1, parseInt(main.querySelector("#mesa-n").value, 10) || 1);
-      const url = `${originPublico()}/${chave}/mesa/${n}`;
-      main.querySelector("#qr-link").textContent = url;
-      const dataUrl = await QRCode.toDataURL(url, { width: 440, margin: 1 });
-      main.querySelector("#qr-box").innerHTML = `<img src="${dataUrl}" alt="QR mesa ${n}"><p>Mesa ${n}</p><p class="qr-link">${url}</p>`;
+      main.querySelector("#mesa-n").value = String(n);
+      mesaUrl = `${originPublico()}/${chave}/mesa/${n}`;
+      mesaQr = await QRCode.toDataURL(mesaUrl, { width: 520, margin: 1, color: { dark: "#0b1220", light: "#ffffff" } });
+      main.querySelector("#qr-mesa-url").textContent = mesaUrl;
+      main.querySelector("#qr-mesa-art").innerHTML = `
+        <img src="${mesaQr}" alt="QR mesa ${n}">
+        <strong>Mesa ${n}</strong>
+        <small>${esc(nome)}</small>
+      `;
     };
-    main.querySelector("#btn-qr").addEventListener("click", gerar);
-    await gerar();
-    const lojaQr = await QRCode.toDataURL(urlLoja, { width: 280, margin: 1 });
-    main.querySelector("#qr-loja").innerHTML = `<img src="${lojaQr}" alt="QR da loja">`;
+    main.querySelector("#mesa-menos").addEventListener("click", async () => {
+      const el = main.querySelector("#mesa-n");
+      el.value = String(Math.max(1, (parseInt(el.value, 10) || 1) - 1));
+      await gerarMesa();
+    });
+    main.querySelector("#mesa-mais").addEventListener("click", async () => {
+      const el = main.querySelector("#mesa-n");
+      el.value = String(Math.max(1, (parseInt(el.value, 10) || 1) + 1));
+      await gerarMesa();
+    });
+    main.querySelector("#mesa-n").addEventListener("change", gerarMesa);
+    main.querySelector("#qr-mesa-copiar").addEventListener("click", () => copiar(mesaUrl));
+    main.querySelector("#qr-mesa-baixar").addEventListener("click", () => baixar(mesaQr, `mesa-${main.querySelector("#mesa-n").value}.png`));
+    await gerarMesa();
+    const lojaQr = await QRCode.toDataURL(urlLoja, { width: 520, margin: 1, color: { dark: "#0b1220", light: "#ffffff" } });
+    main.querySelector("#qr-loja-art").innerHTML = `
+      <img src="${lojaQr}" alt="QR da loja">
+      <strong>${esc(nome)}</strong>
+      <small>${esc(CANAL_LOJA)}</small>
+    `;
+    main.querySelector("#qr-loja-copiar").addEventListener("click", () => copiar(urlLoja));
+    main.querySelector("#qr-loja-baixar").addEventListener("click", () => baixar(lojaQr, "cardapio-loja.png"));
   }
 
   function pintar() {
-    main.classList.toggle("wide", aba === "pedidos");
+    main.classList.toggle("wide", aba === "pedidos" || aba === "qr");
     if (aba === "cardapio") pintarCardapio();
     else if (aba === "loja") pintarLoja();
     else if (aba === "pedidos") pintarPedidos();

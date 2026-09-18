@@ -82,6 +82,79 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   let grupoAberto = null;
   let catAtiva = "";
   let pularScroll = false;
+
+  function travarFundo(on) {
+    document.documentElement.classList.toggle("is-locked", Boolean(on));
+    document.body.classList.toggle("is-locked", Boolean(on));
+  }
+
+  let itemUi = null;
+
+  function textoRegra(g, precisa) {
+    const usados = qtdNoGrupo(rascunho.extras, g.id);
+    const opcional = g.min <= 0;
+    const ativo = !opcional || Boolean(rascunho.ativos[g.id]);
+    const falta = usados < precisa(g);
+    const escolhida = (g.opcoes.find((o) => qtdOpcao(rascunho.extras, g.id, o.id) > 0) || {}).nome;
+    let regra = opcional && !ativo ? "Desativado" : (escolhida || (g.tipo === "single" ? "Escolha 1" : `${usados}/${g.max || "—"}`));
+    if (falta && ativo) regra = "Escolha 1";
+    if (g.precoGrupo) regra = `${regra} · + ${brl(g.precoGrupo)}`;
+    return regra;
+  }
+
+  function atualizarProdutoAberto() {
+    const overlay = app.querySelector("#prod-overlay");
+    if (!overlay || !itemUi) return;
+    const { grupos, tot, pode, precisa, foco } = itemUi;
+    const body = overlay.querySelector(".prod-body");
+    const y = body ? body.scrollTop : 0;
+    overlay.querySelectorAll(".opt-group[data-g]").forEach((sec) => {
+      const g = grupos.find((x) => String(x.id) === String(sec.dataset.g));
+      if (!g) return;
+      const opcional = g.min <= 0;
+      const ativo = !opcional || Boolean(rascunho.ativos[g.id]);
+      const aberto = String(g.id) === foco && ativo;
+      const falta = qtdNoGrupo(rascunho.extras, g.id) < precisa(g);
+      sec.classList.toggle("open", aberto);
+      sec.classList.toggle("need", falta);
+      const small = sec.querySelector(".opt-head small");
+      if (small) small.textContent = textoRegra(g, precisa);
+      const check = sec.querySelector("[data-toggle-g]");
+      if (check) {
+        check.classList.toggle("on", ativo);
+        check.setAttribute("aria-label", `${ativo ? "Desativar" : "Ativar"} ${g.nome}`);
+      }
+      const q = buscaExtra.trim().toLowerCase();
+      sec.querySelectorAll(".opt-row[data-o]").forEach((row) => {
+        const o = g.opcoes.find((x) => String(x.id) === String(row.dataset.o));
+        if (!o) return;
+        const n = qtdOpcao(rascunho.extras, g.id, o.id);
+        row.classList.toggle("on", n > 0);
+        row.hidden = Boolean(q && !`${o.nome} ${o.descricao || ""}`.toLowerCase().includes(q));
+        const radio = row.querySelector("[data-single]");
+        if (radio) {
+          radio.classList.toggle("on", n > 0);
+          radio.dataset.single = n > 0 ? "0" : "1";
+        }
+        const span = row.querySelector(".qty span");
+        if (span) span.textContent = String(n);
+      });
+    });
+    const qtySpan = overlay.querySelector(".prod-footer .qty span");
+    if (qtySpan) qtySpan.textContent = String(rascunho.qtd);
+    const add = overlay.querySelector("#btn-add");
+    if (add) {
+      add.classList.toggle("is-off", !pode);
+      add.textContent = `Adicionar ${brl(tot)}`;
+    }
+    if (pularScroll) {
+      pularScroll = false;
+      requestAnimationFrame(() => {
+        const el = overlay.querySelector(`[data-open-g="${foco}"]`);
+        if (el) el.scrollIntoView({ block: "nearest", behavior: reduzMovimento() ? "auto" : "smooth" });
+      });
+    } else if (body) body.scrollTop = y;
+  }
   let rascunho = novoRascunho();
   const wa = linkWhatsapp(
     publico && publico.whatsapp,
@@ -140,6 +213,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       itemAtual = null;
       rascunho = novoRascunho();
       if (location.pathname !== url) history.pushState({}, "", url);
+      travarFundo(false);
       pintarLista();
     };
     if (overlay && !reduzMovimento()) {
@@ -425,6 +499,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     `;
 
     bindLista();
+    travarFundo(sheetAberto);
   }
 
   function linhasExtra(prod, extras) {
@@ -537,10 +612,15 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     }
     if (!grupoAberto) grupoAberto = pendente ? pendente.id : (grupos[0] && grupos[0].id);
     const foco = String(grupoAberto || "");
-    const prev = app.querySelector(".prod-page");
-    const y = prev ? prev.scrollTop : 0;
+    itemUi = { grupos, tot, pode, motivo, pendente, precisa, foco };
+    const overlayAtual = app.querySelector("#prod-overlay");
     const entrar = animarItem && !reduzMovimento();
     animarItem = false;
+    if (overlayAtual && overlayAtual.dataset.item === String(prod.id) && !entrar) {
+      atualizarProdutoAberto();
+      travarFundo(true);
+      return;
+    }
 
     app.innerHTML = `
       <div class="menu-frame">
@@ -554,27 +634,21 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
               ${prod.descricao ? `<p class="prod-desc">${esc(prod.descricao)}</p>` : ""}
               <p class="prod-from">${mostraAPartirDe(prod) ? "A partir de " : ""}${brl(precoMinimo(prod))}</p>
               ${grupos.length ? grupos.map((g) => {
-                const usados = qtdNoGrupo(rascunho.extras, g.id);
                 const opcional = g.min <= 0;
                 const ativo = !opcional || Boolean(rascunho.ativos[g.id]);
                 const aberto = String(g.id) === foco && ativo;
-                const falta = usados < precisa(g);
-                const escolhida = (g.opcoes.find((o) => qtdOpcao(rascunho.extras, g.id, o.id) > 0) || {}).nome;
+                const falta = qtdNoGrupo(rascunho.extras, g.id) < precisa(g);
                 const q = buscaExtra.trim().toLowerCase();
-                const ops = q ? g.opcoes.filter((o) => `${o.nome} ${o.descricao || ""}`.toLowerCase().includes(q)) : g.opcoes;
-                let regra = opcional && !ativo ? "Desativado" : (escolhida || (g.tipo === "single" ? "Escolha 1" : `${usados}/${g.max || "—"}`));
-                if (falta && ativo) regra = "Escolha 1";
-                if (g.precoGrupo) regra = `${regra} · + ${brl(g.precoGrupo)}`;
                 return `
-                  <section class="opt-group${aberto ? " open" : ""}${falta ? " need" : ""}">
+                  <section class="opt-group${aberto ? " open" : ""}${falta ? " need" : ""}" data-g="${esc(g.id)}">
                     <header>
                       ${opcional ? `<button type="button" class="opt-check${ativo ? " on" : ""}" data-toggle-g="${esc(g.id)}" aria-label="${ativo ? "Desativar" : "Ativar"} ${esc(g.nome)}"></button>` : ""}
                       <button type="button" class="opt-head" data-open-g="${esc(g.id)}">
                         <h2>${esc(g.nome)}</h2>
-                        <small>${esc(regra)}</small>
+                        <small>${esc(textoRegra(g, precisa))}</small>
                       </button>
                     </header>
-                    ${aberto ? `
+                    <div class="opt-body"><div class="opt-body-in">
                       ${g.precoGrupo ? `
                         <div class="opt-row locked">
                           <div>
@@ -584,11 +658,12 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
                           <em>+ ${brl(g.precoGrupo)}</em>
                         </div>` : ""}
                       ${g.opcoes.length > 16 ? `<input type="search" class="opt-search" placeholder="Pesquisar em ${esc(g.nome)}" value="${esc(buscaExtra)}">` : ""}
-                      ${ops.map((o) => {
+                      ${g.opcoes.map((o) => {
                         const n = qtdOpcao(rascunho.extras, g.id, o.id);
                         const on = n > 0;
+                        const hide = q && !`${o.nome} ${o.descricao || ""}`.toLowerCase().includes(q);
                         return `
-                          <div class="opt-row ${on ? "on" : ""}">
+                          <div class="opt-row ${on ? "on" : ""}" data-g="${esc(g.id)}" data-o="${esc(o.id)}"${hide ? " hidden" : ""}>
                             <div>
                               <strong>${esc(o.nome)}</strong>
                               ${o.descricao ? `<small>${esc(o.descricao)}</small>` : ""}
@@ -597,13 +672,13 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
                             ${g.tipo === "single"
                               ? `<button type="button" class="opt-radio ${on ? "on" : ""}" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-single="${on ? 0 : 1}" aria-label="${esc(o.nome)}"></button>`
                               : `<div class="qty mini">
-                                  <button type="button" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-q="${n - 1}">−</button>
+                                  <button type="button" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-delta="-1">−</button>
                                   <span>${n}</span>
-                                  <button type="button" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-q="${n + 1}">+</button>
+                                  <button type="button" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-delta="1">+</button>
                                 </div>`}
                           </div>`;
-                      }).join("") || `<p class="empty">Nenhuma opção nesta busca.</p>`}
-                    ` : ""}
+                      }).join("")}
+                    </div></div>
                   </section>`;
               }).join("") : ""}
               <section class="opt-group open">
@@ -626,16 +701,17 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       </div>
     `;
 
-    const page = app.querySelector(".prod-page");
-    if (page && !pularScroll) page.scrollTop = y;
+    const overlay = app.querySelector("#prod-overlay");
+    overlay.dataset.item = String(prod.id);
+    travarFundo(true);
     if (pularScroll) {
       pularScroll = false;
       requestAnimationFrame(() => {
-        const el = app.querySelector(`[data-open-g="${foco}"]`);
+        const el = overlay.querySelector(`[data-open-g="${foco}"]`);
         if (el) el.scrollIntoView({ block: "nearest", behavior: reduzMovimento() ? "auto" : "smooth" });
       });
     }
-    app.querySelector("#prod-overlay").addEventListener("click", (ev) => {
+    overlay.addEventListener("click", (ev) => {
       if (ev.target.id === "prod-overlay") fecharItem();
     });
 
@@ -671,33 +747,38 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     app.querySelectorAll("[data-open-g]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const id = btn.dataset.openG;
-        const g = grupos.find((x) => String(x.id) === String(id));
+        const g = (itemUi && itemUi.grupos || []).find((x) => String(x.id) === String(id));
         if (g && g.min <= 0) rascunho.ativos[id] = true;
         grupoAberto = id;
         pintar();
       });
     });
-    app.querySelectorAll("[data-g][data-o]").forEach((btn) => {
+    app.querySelectorAll("button[data-g][data-o]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const g = grupos.find((x) => String(x.id) === String(btn.dataset.g));
+        const gruposNow = (itemUi && itemUi.grupos) || [];
+        const g = gruposNow.find((x) => String(x.id) === String(btn.dataset.g));
         const o = g && g.opcoes.find((x) => String(x.id) === String(btn.dataset.o));
         if (!g || !o) return;
-        if (btn.dataset.single != null) setExtra(g, o, Number(btn.dataset.single), grupos);
-        else setExtra(g, o, Number(btn.dataset.q), grupos);
+        if (btn.dataset.single != null) setExtra(g, o, Number(btn.dataset.single), gruposNow);
+        else if (btn.dataset.delta != null) {
+          const n = qtdOpcao(rascunho.extras, g.id, o.id);
+          setExtra(g, o, n + Number(btn.dataset.delta), gruposNow);
+        }
       });
     });
     app.querySelector("#btn-add").addEventListener("click", () => {
-      if (!pode) {
-        if (pendente) {
-          grupoAberto = pendente.id;
-          if (pendente.min <= 0) rascunho.ativos[pendente.id] = true;
+      const ui = itemUi || {};
+      if (!ui.pode) {
+        if (ui.pendente) {
+          grupoAberto = ui.pendente.id;
+          if (ui.pendente.min <= 0) rascunho.ativos[ui.pendente.id] = true;
           pintar();
           requestAnimationFrame(() => {
-            const el = app.querySelector(`[data-open-g="${pendente.id}"]`);
+            const el = app.querySelector(`[data-open-g="${ui.pendente.id}"]`);
             if (el) el.scrollIntoView({ block: "center", behavior: reduzMovimento() ? "auto" : "smooth" });
           });
         }
-        toast(motivo || "Complete as opções do item.");
+        toast(ui.motivo || "Complete as opções do item.");
         return;
       }
       adicionarAoPedido();
