@@ -13,7 +13,8 @@ import {
 } from "../lib/overlay.js";
 import { atualizarStatusPedido, escutarPedidosLoja, invalidarCardapioPublico } from "../lib/pedidos.js";
 import { brl, erroAmigavel, originPublico, esc, soDigitos, toast } from "../lib/format.js";
-import { sanitizarGrupos, textoExtras } from "../lib/grupos.js";
+import { sanitizarGrupos } from "../lib/grupos.js";
+import { horaPedido, htmlLinhaItem } from "../lib/pedido-ui.js";
 import { abrirEditorGrupos } from "./painel-grupos.js";
 import {
   CANAL_LOJA,
@@ -59,11 +60,19 @@ function rotuloStatus(status) {
   })[status] || status;
 }
 
-function linhaPedidoItem(i) {
-  const extra = textoExtras(i.extras) || i.detalhe || "";
-  const obs = i.observacao ? ` — ${i.observacao}` : "";
-  return `${esc(i.quantidade)}× ${esc(i.nome)}${extra ? ` (${esc(extra)})` : ""}${esc(obs)}`;
+function acaoStatus(status) {
+  if (status === "em_preparo") return "Preparar";
+  if (status === "pronto") return "Marcar pronto";
+  if (status === "entregue") return "Entregar";
+  return rotuloStatus(status);
 }
+
+const COLUNAS = [
+  { id: "novo", label: "Novos" },
+  { id: "em_preparo", label: "Em preparo" },
+  { id: "pronto", label: "Prontos" },
+  { id: "entregue", label: "Entregues" }
+];
 
 export async function renderPainel(app, sessao) {
   document.body.className = "is-painel";
@@ -77,6 +86,7 @@ export async function renderPainel(app, sessao) {
   let pedidos = [];
   let conhecidos = new Set();
   let primeiroSnap = true;
+  let assinaturaPedidos = "";
 
   app.innerHTML = `
     <div class="painel-shell">
@@ -501,49 +511,95 @@ export async function renderPainel(app, sessao) {
       conhecidos = new Set(lista.map((p) => p.id));
       primeiroSnap = false;
       pedidos = lista;
-      if (aba === "pedidos") pintarPedidos();
+      const sig = lista.map((p) => `${p.id}:${p.status}:${p.atualizadoEm || ""}`).join("|");
+      if (aba === "pedidos" && sig !== assinaturaPedidos) pintarPedidos();
+      else assinaturaPedidos = sig;
     }, (err) => {
       if (aba === "pedidos") main.innerHTML = `<p class="empty">${erroAmigavel(err)}</p>`;
     });
   }
 
+  function fotoItemPedido(i) {
+    if (i && i.fotoUrl) return i.fotoUrl;
+    const ov = overlays[i && i.id] || overlays[String(i && i.id)];
+    if (ov && ov.fotoUrl) return ov.fotoUrl;
+    const p = produtos.find((x) => String(x.id) === String(i && i.id));
+    return (p && (p.fotoUrl || p.imagem)) || "";
+  }
+
+  function htmlCardPedido(p) {
+    const prox = proximoStatus(p.status);
+    const onde = p.tipo === "mesa" ? `Mesa ${p.numeroMesa}` : CANAL_LOJA;
+    const hora = horaPedido(p.at || p.atualizadoEm);
+    const itens = (p.itens || []).map((i) => htmlLinhaItem({ ...i, fotoUrl: fotoItemPedido(i) })).join("");
+    return `
+      <article class="k-card" data-id="${esc(p.id)}">
+        <header>
+          <div>
+            <strong>${esc(onde)}</strong>
+            <small>${hora ? `${hora} · ` : ""}#${esc(String(p.id || "").replace(/^PED-/, "").slice(-6).toUpperCase())}</small>
+          </div>
+          <span class="badge ${esc(p.status || "novo")}">${esc(rotuloStatus(p.status))}</span>
+        </header>
+        <ul class="pi-list">${itens}</ul>
+        <footer>
+          <b>${brl(p.total)}</b>
+          <div class="pedido-btns">
+            ${prox ? `<button class="btn-primary fit" data-st="${prox}" data-id="${esc(p.id)}" type="button">${esc(acaoStatus(prox))}</button>` : ""}
+            ${p.status !== "cancelado" && p.status !== "entregue" ? `<button class="btn-ghost" data-st="cancelado" data-id="${esc(p.id)}" type="button">Cancelar</button>` : ""}
+          </div>
+        </footer>
+      </article>`;
+  }
+
   function pintarPedidos() {
     garantirPedidos();
+    assinaturaPedidos = pedidos.map((p) => `${p.id}:${p.status}:${p.atualizadoEm || ""}`).join("|");
+    main.classList.add("wide");
     if (!pedidos.length) {
       main.innerHTML = `<div class="empty-card"><h2>Nenhum pedido ainda</h2><p>Publique o cardápio e teste o QR da mesa ou o link de ${CANAL_LOJA.toLowerCase()}.</p></div>`;
       return;
     }
+    const por = {
+      novo: pedidos.filter((p) => p.status === "novo"),
+      em_preparo: pedidos.filter((p) => p.status === "em_preparo"),
+      pronto: pedidos.filter((p) => p.status === "pronto"),
+      entregue: pedidos.filter((p) => p.status === "entregue" || p.status === "cancelado")
+    };
     main.innerHTML = `
-      <section class="page-head"><div><h2>Pedidos ao vivo</h2><p>Novos pedidos avisam com um som. Avance o status conforme a cozinha.</p></div></section>
-      <div class="pedido-list">
-        ${pedidos.map((p) => {
-          const prox = proximoStatus(p.status);
-          const itens = (p.itens || []).map((i) => `<li>${linhaPedidoItem(i)}</li>`).join("");
-          const onde = p.tipo === "mesa" ? `Mesa ${p.numeroMesa}` : CANAL_LOJA;
+      <section class="page-head"><div><h2>Pedidos ao vivo</h2><p>Kanban da cozinha. Novos pedidos avisam com um som.</p></div></section>
+      <div class="kanban">
+        ${COLUNAS.map((col) => {
+          const lista = por[col.id] || [];
           return `
-            <article class="pedido">
+            <section class="kanban-col ${col.id}">
               <header>
-                <div>
-                  <strong>${onde}</strong>
-                  <small>${brl(p.total)} · ${esc(String(p.id || "").slice(-6).toUpperCase())}</small>
-                </div>
-                <span class="badge ${p.status || "novo"}">${rotuloStatus(p.status)}</span>
+                <h3>${esc(col.label)}</h3>
+                <span>${lista.length}</span>
               </header>
-              <ul class="pedido-itens">${itens}</ul>
-              <div class="pedido-btns">
-                ${prox ? `<button class="btn-primary fit" data-st="${prox}" data-id="${p.id}">${rotuloStatus(prox)}</button>` : ""}
-                ${p.status !== "cancelado" && p.status !== "entregue" ? `<button class="btn-ghost" data-st="cancelado" data-id="${p.id}">Cancelar</button>` : ""}
+              <div class="kanban-stack">
+                ${lista.map((p) => htmlCardPedido(p)).join("") || `<p class="kanban-empty">Nenhum pedido</p>`}
               </div>
-            </article>
-          `;
+            </section>`;
         }).join("")}
       </div>
     `;
     main.querySelectorAll("[data-st]").forEach((btn) => {
       btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        const st = btn.dataset.st;
+        const p = pedidos.find((x) => x.id === id);
+        if (p) {
+          p.status = st;
+          p.atualizadoEm = new Date().toISOString();
+        }
+        btn.disabled = true;
+        pintarPedidos();
         try {
-          await atualizarStatusPedido(chave, btn.dataset.id, btn.dataset.st);
-        } catch (err) { toast(erroAmigavel(err)); }
+          await atualizarStatusPedido(chave, id, st);
+        } catch (err) {
+          toast(erroAmigavel(err));
+        }
       });
     });
   }
@@ -589,6 +645,7 @@ export async function renderPainel(app, sessao) {
   }
 
   function pintar() {
+    main.classList.toggle("wide", aba === "pedidos");
     if (aba === "cardapio") pintarCardapio();
     else if (aba === "loja") pintarLoja();
     else if (aba === "pedidos") pintarPedidos();

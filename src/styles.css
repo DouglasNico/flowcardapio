@@ -36,6 +36,17 @@ body.is-menu {
 body.is-painel { background: #eef1f6; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
+button, .btn-primary, .btn-ghost, .chip, .tabs button, .qty button, .cart-bar button, .opt-head, .opt-check, .opt-radio, .icon-btn, a.btn-primary {
+  transition: transform .16s ease, background-color .16s ease, box-shadow .16s ease, border-color .16s ease, color .16s ease, opacity .16s ease, filter .16s ease;
+}
+.btn-primary:hover:not(:disabled):not(.is-off) { filter: brightness(1.06); transform: translateY(-1px); }
+.btn-primary:active:not(:disabled):not(.is-off), .btn-ghost:active, .qty button:active, .cart-bar button:active {
+  transform: translateY(0) scale(.98);
+}
+.btn-ghost:hover { background: #f7f8fb; border-color: #d5dbe4; }
+.tabs button:hover:not(.on) { background: #fff; color: var(--navy); }
+.qty button:hover, .icon-btn:hover { background: #fff; }
+.cart-bar button:hover { filter: brightness(1.06); }
 a { color: var(--orange-dark); }
 img { max-width: 100%; display: block; }
 svg { display: block; }
@@ -126,6 +137,7 @@ svg { display: block; }
 }
 .painel-top .btn-ghost { background: #fff; border-color: #dfe3ea; color: var(--navy); }
 .painel-body { padding: 22px 18px 40px; max-width: 1180px; width: 100%; margin: 0 auto; }
+.painel-body.wide { max-width: 1440px; }
 .page-head {
   display: flex; justify-content: space-between; gap: 16px; align-items: flex-end;
   flex-wrap: wrap; margin-bottom: 16px;
@@ -180,6 +192,43 @@ svg { display: block; }
 .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
 .pedido-list { display: grid; gap: 12px; }
+.kanban {
+  display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr));
+  gap: 14px; align-items: start; overflow-x: auto; padding-bottom: 8px;
+}
+.kanban-col {
+  background: #f4f6f9; border-radius: 18px; padding: 12px;
+  min-height: 240px; min-width: 240px;
+}
+.kanban-col header {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; margin: 0 2px 12px;
+}
+.kanban-col h3 { margin: 0; font-size: 13px; font-weight: 800; letter-spacing: .02em; }
+.kanban-col header span {
+  background: #fff; color: var(--slate); font-size: 11px; font-weight: 800;
+  border-radius: 999px; padding: 3px 8px;
+}
+.kanban-col.novo { background: #fff7f0; }
+.kanban-col.em_preparo { background: #f3f7ff; }
+.kanban-col.pronto { background: #f1faf4; }
+.kanban-empty { margin: 24px 8px; color: var(--muted); font-size: 13px; text-align: center; }
+.k-card {
+  display: grid; gap: 10px; padding: 12px; margin-bottom: 10px;
+  background: #fff; border: 1px solid #e6eaf0; border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(15,23,42,.04);
+  animation: kIn .28s ease;
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.k-card:hover { transform: translateY(-2px); box-shadow: 0 14px 28px rgba(15,23,42,.08); }
+.k-card header { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.k-card header strong { display: block; font-size: 15px; }
+.k-card header small { display: block; color: var(--muted); font-weight: 700; font-size: 11px; margin-top: 2px; }
+.k-card footer {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
+  border-top: 1px solid #eef1f5; padding-top: 10px;
+}
+.k-card footer b { color: var(--orange-dark); }
 .pedido {
   display: grid; gap: 10px; padding: 16px; border: 1px solid #e6eaf0;
   border-radius: 18px; background: #fff; box-shadow: 0 10px 30px rgba(15,23,42,.04);
@@ -195,6 +244,17 @@ svg { display: block; }
 .badge.cancelado { background: #fee2e2; color: #991b1b; }
 .pedido-itens { margin: 0; padding-left: 18px; font-size: 14px; color: var(--slate); }
 .pedido-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.pi-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pi { display: grid; grid-template-columns: 48px 1fr; gap: 10px; align-items: start; }
+.pi-foto {
+  width: 48px; height: 48px; border-radius: 12px; object-fit: cover; background: #ece7e0;
+}
+.pi-foto.ph { display: grid; place-items: center; color: #b3a99d; }
+.pi-foto.ph svg { width: 18px; height: 18px; }
+.pi-copy { min-width: 0; }
+.pi-copy strong { display: block; font-size: 13px; line-height: 1.3; }
+.pi-copy small { display: block; color: var(--slate); font-size: 12px; margin-top: 2px; }
+.pi-obs { color: var(--muted) !important; font-style: italic; }
 .empty-card {
   background: #fff; border-radius: 18px; padding: 48px 24px; text-align: center;
   border: 1px dashed #d7dde6;
@@ -409,6 +469,7 @@ svg { display: block; }
   transition: transform .18s ease, box-shadow .18s ease;
 }
 .menu-item:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(20,24,33,.08); }
+.menu-item:active { transform: translateY(0) scale(.99); }
 .menu-copy {
   min-height: 0; display: flex; flex-direction: column; justify-content: flex-start;
   padding: 10px 10px 12px; flex: 1;
@@ -467,15 +528,45 @@ svg { display: block; }
 }
 .sheet.is-in { animation: fadeDim .28s ease; }
 .sheet-card {
-  background: var(--paper); border-radius: 26px 26px 0 0; padding: 10px 18px 24px;
-  max-height: 88dvh; overflow: auto; width: min(var(--frame), 100%);
+  background: var(--paper); border-radius: 26px 26px 0 0;
+  max-height: 88dvh; overflow: hidden; width: min(var(--frame), 100%);
+  display: flex; flex-direction: column; padding: 10px 0 0;
 }
 .sheet.is-in .sheet-card { animation: slideUp .34s cubic-bezier(.22,.8,.2,1); }
 .sheet-grab {
   width: 42px; height: 4px; background: #ddd4c8; border-radius: 999px; margin: 6px auto 10px;
 }
+.sheet-head, .sheet-body { padding: 0 18px; }
 .sheet-head h2 { margin: 0; font-size: 20px; font-weight: 800; }
 .sheet-head p { margin: 2px 0 12px; color: var(--muted); font-size: 13px; }
+.sheet-body { overflow: auto; flex: 1; min-height: 0; }
+.sheet-foot {
+  padding: 8px 18px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line); background: var(--paper);
+}
+.sheet-foot .btn-ghost { width: 100%; margin-top: 8px; }
+.k-card .btn-primary.fit { padding: 8px 12px; font-size: 12px; }
+.k-card .btn-ghost { padding: 8px 10px; font-size: 12px; }
+.cart-item {
+  display: grid; grid-template-columns: 72px 1fr; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--line);
+}
+.cart-thumb {
+  width: 72px; height: 72px; border-radius: 14px; object-fit: cover; background: #e8e2d8;
+}
+.cart-thumb.ph { display: grid; place-items: center; color: #b3a99d; }
+.cart-thumb.ph svg { width: 22px; height: 22px; }
+.cart-copy { min-width: 0; }
+.cart-item-top { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+.cart-item-top strong { font-size: 14px; line-height: 1.3; }
+.cart-item-top b { color: var(--orange-dark); white-space: nowrap; }
+.cart-extras { list-style: none; margin: 6px 0 0; padding: 0; }
+.cart-extras li { font-size: 12px; color: var(--slate); display: flex; gap: 6px; margin-top: 2px; }
+.cart-extras em { font-style: normal; color: var(--muted); font-weight: 700; flex: 0 0 auto; }
+.cart-obs { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.cart-item-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+.cart-del { border: 0; background: none; color: #b42318; font-weight: 700; font-size: 12px; padding: 4px 0; }
+.cart-del:hover { text-decoration: underline; }
 .cart-line {
   display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 0;
   border-bottom: 1px solid var(--line); font-size: 14px;
@@ -605,14 +696,20 @@ svg { display: block; }
   to { transform: scale(1); }
 }
 
+@keyframes kIn {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
 .track-page .store-head { padding-bottom: 12px; }
 .track-page .store-row { grid-template-columns: 1fr; }
 .track-page .store-meta h1 { font-size: 18px; }
 .track-card {
   margin: 18px; background: #fff; border: 1px solid var(--line); border-radius: 22px; padding: 22px 18px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow); animation: kIn .32s ease;
 }
-.track-card .badge { display: inline-block; margin-bottom: 4px; }
+.track-card .badge { display: inline-block; margin-bottom: 8px; }
+.track-title { margin: 0 0 4px; font-size: 20px; letter-spacing: -.3px; }
 .track-id { margin: 0 0 12px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; }
 .steps {
   list-style: none; display: grid; gap: 0; padding: 8px 4px 18px; margin: 0;
@@ -633,9 +730,9 @@ svg { display: block; }
 .steps li.done, .steps li.now { color: var(--navy); }
 .steps li.done::before, .steps li.now::before { background: var(--orange); }
 .steps li.now { color: var(--orange-dark); }
-.track-itens { text-align: left; display: grid; gap: 0; padding: 0; list-style: none; margin: 0 0 8px; }
-.track-itens li { border-top: 1px solid var(--line); padding: 10px 0; display: grid; }
-.track-itens small { color: var(--muted); }
+.track-itens { text-align: left; display: grid; gap: 10px; padding: 8px 0; list-style: none; margin: 0 0 8px; }
+.track-itens .pi { grid-template-columns: 56px 1fr; padding: 10px 0; border-top: 1px solid var(--line); }
+.track-itens .pi-foto { width: 56px; height: 56px; }
 .track-total {
   display: flex; justify-content: space-between; align-items: center;
   padding: 12px 0 16px; font-size: 18px;
@@ -653,6 +750,7 @@ svg { display: block; }
   .prod-card .thumb { width: 64px; height: 64px; }
   .loja-grid, .loja-times { grid-template-columns: 1fr; }
   .ed-opt { grid-template-columns: 1fr 96px 36px; }
+  .kanban { grid-template-columns: repeat(4, minmax(260px, 1fr)); }
 }
 
 @media (min-width: 720px) {
@@ -693,6 +791,7 @@ svg { display: block; }
   .store-head { padding: 16px 22px; }
   .cats { margin-left: -22px; margin-right: -22px; padding: 0 22px; }
   .pedido-list { grid-template-columns: 1fr 1fr; }
+  .kanban { grid-template-columns: repeat(4, minmax(220px, 1fr)); }
 }
 
 @media (min-width: 1200px) {
@@ -705,7 +804,7 @@ svg { display: block; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .menu-item, .prod-overlay, .prod-page, .prod-hero, .sheet, .sheet-card {
+  .menu-item, .prod-overlay, .prod-page, .prod-hero, .sheet, .sheet-card, .k-card, .track-card {
     animation: none !important; transition: none !important;
   }
 }

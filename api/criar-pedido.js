@@ -164,6 +164,7 @@ export default async function handler(req, res) {
         precoUnitario,
         observacao,
         detalhe,
+        fotoUrl: String(prod.fotoUrl || ""),
         origemPedidoId: pedidoId
       });
       total += precoUnitario * quantidade;
@@ -194,7 +195,12 @@ export default async function handler(req, res) {
         nome: i.nome,
         quantidade: i.quantidade,
         detalhe: i.detalhe || "",
-        observacao: i.observacao || ""
+        observacao: i.observacao || "",
+        fotoUrl: i.fotoUrl || "",
+        extras: (i.extras || []).map((e) => ({
+          nome: e.nome || "",
+          quantidade: e.quantidade || 1
+        }))
       })),
       at: agora,
       atualizadoEm: agora

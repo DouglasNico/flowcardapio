@@ -1,6 +1,7 @@
 import { criarPedido, lerCardapioPublico } from "../lib/pedidos.js";
 import { brl, erroAmigavel, esc, linkWhatsapp, toast } from "../lib/format.js";
 import { ico } from "../lib/icons.js";
+import { guardarPedidoLocal } from "../lib/pedido-ui.js";
 import {
   idCategoria,
   mostraAPartirDe,
@@ -32,7 +33,8 @@ function lerCarrinho(chave, mesa) {
       preco: Number(i.preco) || 0,
       quantidade: Math.max(1, Number(i.quantidade) || 1),
       observacao: i.observacao || "",
-      extras: Array.isArray(i.extras) ? i.extras : []
+      extras: Array.isArray(i.extras) ? i.extras : [],
+      fotoUrl: i.fotoUrl || ""
     }));
   } catch {
     return [];
@@ -74,6 +76,8 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   let buscaExtra = "";
   let carrinho = lerCarrinho(chave, mesa);
   let sheetAberto = false;
+  let revisando = false;
+  let sheetAnimar = true;
   let animarItem = Boolean(itemId);
   let fechandoItem = false;
   let grupoAberto = null;
@@ -210,7 +214,8 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       preco: Number(prod.preco) || 0,
       quantidade: Math.max(1, rascunho.qtd),
       observacao: String(rascunho.obs || "").slice(0, 180),
-      extras: rascunho.extras
+      extras: rascunho.extras,
+      fotoUrl: prod.fotoUrl || ""
     });
     salvarCarrinho(chave, mesa, carrinho);
     toast("Adicionado ao pedido");
@@ -238,13 +243,43 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
           }))
         }))
       });
+      const pedidoId = (res.pedido && res.pedido.id) || res.id;
+      if (!pedidoId) throw new Error("Pedido enviado, mas sem código de acompanhamento.");
+      const remoto = (res.pedido && res.pedido.itens) || [];
+      guardarPedidoLocal({
+        id: pedidoId,
+        chaveLicenca: chave,
+        tipo: mesa ? "mesa" : "retirada",
+        numeroMesa: mesa || null,
+        status: (res.pedido && res.pedido.status) || "novo",
+        total: (res.pedido && res.pedido.total) != null ? res.pedido.total : totalCarrinho(),
+        nomeLoja: (res.pedido && res.pedido.nomeLoja) || (publico && publico.nome) || "",
+        itens: carrinho.map((i, idx) => {
+          const p = produtos.find((x) => String(x.id) === String(i.id));
+          const r = remoto[idx] || {};
+          return {
+            id: i.id,
+            nome: r.nome || i.nome,
+            quantidade: i.quantidade,
+            detalhe: r.detalhe || textoExtras(i.extras),
+            observacao: i.observacao || "",
+            fotoUrl: r.fotoUrl || i.fotoUrl || (p && p.fotoUrl) || "",
+            extras: (r.extras && r.extras.length) ? r.extras : (i.extras || [])
+          };
+        }),
+        at: (res.pedido && res.pedido.at) || new Date().toISOString()
+      });
       salvarCarrinho(chave, mesa, []);
       sessionStorage.removeItem(`flowpdv_idem_${chave}_${mesa || "r"}`);
-      const pedidoId = (res.pedido && res.pedido.id) || res.id;
       history.pushState({}, "", `/${chave}/pedido/${pedidoId}`);
       window.dispatchEvent(new Event("flowpdv:route"));
     } catch (err) {
       toast(erroAmigavel(err), 3200);
+      const enviarBtn = app.querySelector("#btn-enviar");
+      if (enviarBtn) {
+        enviarBtn.disabled = false;
+        enviarBtn.textContent = `Confirmar e enviar · ${brl(totalCarrinho())}`;
+      }
     }
   }
 
@@ -395,42 +430,96 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     bindLista();
   }
 
-  function pintarSheet() {
+  function linhasExtra(prod, extras) {
+    const grupos = sanitizarGrupos(prod && prod.grupos);
+    return (extras || []).map((e) => {
+      const g = grupos.find((x) => String(x.id) === String(e.grupoId));
+      const q = Number(e.quantidade) || 1;
+      return {
+        grupo: (g && g.nome) || "",
+        nome: q > 1 ? `${q}× ${e.nome}` : (e.nome || "")
+      };
+    }).filter((x) => x.nome);
+  }
+
+  function htmlCartItem(i, editar) {
+    const p = produtos.find((x) => String(x.id) === String(i.id));
+    const tot = p ? precoLinha(p, i.extras, i.quantidade) : (i.preco * i.quantidade);
+    const foto = (p && p.fotoUrl) || i.fotoUrl;
+    const extras = linhasExtra(p, i.extras);
     return `
-      <div class="sheet is-in" id="sheet">
+      <article class="cart-item" data-linha="${esc(i.linhaId)}">
+        ${foto
+          ? `<img class="cart-thumb" src="${esc(foto)}" alt="">`
+          : `<div class="cart-thumb ph">${ico.photo}</div>`}
+        <div class="cart-copy">
+          <div class="cart-item-top">
+            <strong>${esc(i.quantidade)}× ${esc(i.nome)}</strong>
+            <b>${brl(tot)}</b>
+          </div>
+          ${extras.length ? `
+            <ul class="cart-extras">
+              ${extras.map((e) => `<li>${e.grupo ? `<em>${esc(e.grupo)}</em>` : ""}<span>${esc(e.nome)}</span></li>`).join("")}
+            </ul>` : ""}
+          ${i.observacao ? `<p class="cart-obs">Obs.: ${esc(i.observacao)}</p>` : ""}
+          ${editar ? `
+            <div class="cart-item-foot">
+              <div class="qty mini">
+                <button type="button" data-minus-line>−</button>
+                <span>${i.quantidade}</span>
+                <button type="button" data-plus-line>+</button>
+              </div>
+              <button type="button" class="cart-del" data-del-line>Remover</button>
+            </div>` : ""}
+        </div>
+      </article>`;
+  }
+
+  function pintarSheet() {
+    const canal = mesa ? `Mesa ${esc(String(mesa))}` : CANAL_LOJA;
+    if (revisando) {
+      return `
+        <div class="sheet${sheetAnimar ? " is-in" : ""}" id="sheet">
+          <div class="sheet-card">
+            <div class="sheet-grab"></div>
+            <header class="sheet-head">
+              <h2>Confira seu pedido</h2>
+              <p>${canal} · ${nItens()} ${nItens() === 1 ? "item" : "itens"}</p>
+            </header>
+            <div class="sheet-body">
+              ${carrinho.map((i) => htmlCartItem(i, false)).join("")}
+            </div>
+            <div class="sheet-foot">
+              <div class="cart-total">
+                <span>Total</span>
+                <strong>${brl(totalCarrinho())}</strong>
+              </div>
+              <button class="btn-primary" id="btn-enviar" type="button">Confirmar e enviar · ${brl(totalCarrinho())}</button>
+              <button class="btn-ghost" id="btn-voltar-resumo" type="button">Voltar e ajustar</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    return `
+      <div class="sheet${sheetAnimar ? " is-in" : ""}" id="sheet">
         <div class="sheet-card">
           <div class="sheet-grab"></div>
           <header class="sheet-head">
             <h2>Seu pedido</h2>
-            <p>${mesa ? `Mesa ${esc(String(mesa))}` : CANAL_LOJA}</p>
+            <p>${canal}</p>
           </header>
-          ${carrinho.map((i) => {
-            const p = produtos.find((x) => String(x.id) === String(i.id));
-            const extra = textoExtras(i.extras);
-            const tot = p ? precoLinha(p, i.extras, i.quantidade) : (i.preco * i.quantidade);
-            return `
-              <div class="cart-line" data-linha="${esc(i.linhaId)}">
-                <div>
-                  <strong>${esc(i.nome)}</strong>
-                  ${extra ? `<small>${esc(extra)}</small>` : ""}
-                  ${i.observacao ? `<small>${esc(i.observacao)}</small>` : ""}
-                </div>
-                <div class="cart-line-side">
-                  <div class="qty mini">
-                    <button type="button" data-minus-line>−</button>
-                    <span>${i.quantidade}</span>
-                    <button type="button" data-plus-line>+</button>
-                  </div>
-                  <b>${brl(tot)}</b>
-                </div>
-              </div>`;
-          }).join("")}
-          <div class="cart-total">
-            <span>Total</span>
-            <strong>${brl(totalCarrinho())}</strong>
+          <div class="sheet-body">
+            ${carrinho.map((i) => htmlCartItem(i, true)).join("")}
           </div>
-          <button class="btn-primary" id="btn-enviar" type="button">Enviar pedido · ${brl(totalCarrinho())}</button>
-          <button class="btn-ghost" id="btn-fechar" type="button">Continuar pedindo</button>
+          <div class="sheet-foot">
+            <div class="cart-total">
+              <span>${nItens()} ${nItens() === 1 ? "item" : "itens"}</span>
+              <strong>${brl(totalCarrinho())}</strong>
+            </div>
+            <button class="btn-primary" id="btn-revisar" type="button">Revisar pedido · ${brl(totalCarrinho())}</button>
+            <button class="btn-ghost" id="btn-fechar" type="button">Continuar pedindo</button>
+          </div>
         </div>
       </div>
     `;
@@ -663,23 +752,29 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       });
     });
     const ver = app.querySelector("#btn-ver-pedido");
-    if (ver) ver.addEventListener("click", () => { sheetAberto = true; pintar(); });
+    if (ver) ver.addEventListener("click", () => { revisando = false; sheetAnimar = true; sheetAberto = true; pintar(); });
     const fechar = app.querySelector("#btn-fechar");
-    if (fechar) fechar.addEventListener("click", () => { sheetAberto = false; pintar(); });
+    if (fechar) fechar.addEventListener("click", () => { sheetAberto = false; revisando = false; pintar(); });
+    const voltarResumo = app.querySelector("#btn-voltar-resumo");
+    if (voltarResumo) voltarResumo.addEventListener("click", () => { revisando = false; sheetAnimar = false; pintar(); });
+    const revisar = app.querySelector("#btn-revisar");
+    if (revisar) revisar.addEventListener("click", () => { revisando = true; sheetAnimar = false; pintar(); });
     const sheet = app.querySelector("#sheet");
     if (sheet) {
       sheet.addEventListener("click", (ev) => {
-        if (ev.target.id === "sheet") { sheetAberto = false; pintar(); }
+        if (ev.target.id === "sheet") { sheetAberto = false; revisando = false; pintar(); }
       });
     }
     app.querySelectorAll("[data-linha]").forEach((row) => {
       const id = row.dataset.linha;
       const plus = row.querySelector("[data-plus-line]");
       const minus = row.querySelector("[data-minus-line]");
+      const del = row.querySelector("[data-del-line]");
       if (plus) plus.addEventListener("click", () => {
         const i = carrinho.find((x) => x.linhaId === id);
         if (i) i.quantidade = Math.min(99, i.quantidade + 1);
         salvarCarrinho(chave, mesa, carrinho);
+        sheetAnimar = false;
         pintar();
       });
       if (minus) minus.addEventListener("click", () => {
@@ -688,7 +783,15 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         carrinho[i].quantidade -= 1;
         if (carrinho[i].quantidade <= 0) carrinho.splice(i, 1);
         salvarCarrinho(chave, mesa, carrinho);
-        if (!carrinho.length) sheetAberto = false;
+        if (!carrinho.length) { sheetAberto = false; revisando = false; }
+        else sheetAnimar = false;
+        pintar();
+      });
+      if (del) del.addEventListener("click", () => {
+        carrinho = carrinho.filter((x) => x.linhaId !== id);
+        salvarCarrinho(chave, mesa, carrinho);
+        if (!carrinho.length) { sheetAberto = false; revisando = false; }
+        else sheetAnimar = false;
         pintar();
       });
     });
