@@ -193,7 +193,7 @@ export async function renderPainel(app, sessao) {
             <input type="checkbox" id="pausado" ${config.pausado ? "checked" : ""}>
             Pausar cardápio
           </label>
-          <button class="btn-primary" id="lj-salvar" type="button" style="width:auto">Salvar</button>
+          <button class="btn-primary fit" id="lj-salvar" type="button">Salvar</button>
         </div>
       </div>
     `;
@@ -235,7 +235,7 @@ export async function renderPainel(app, sessao) {
         </div>
         <div class="toolbar">
           <input type="search" id="busca" placeholder="Buscar produto">
-          <button class="btn-primary" id="btn-publicar" type="button" style="width:auto">Publicar (${visiveis})</button>
+          <button class="btn-primary fit" id="btn-publicar" type="button">Publicar (${visiveis})</button>
         </div>
       </section>
       <div class="prod-list" id="lista"></div>
@@ -381,7 +381,7 @@ export async function renderPainel(app, sessao) {
               </header>
               <ul class="pedido-itens">${itens}</ul>
               <div class="pedido-btns">
-                ${prox ? `<button class="btn-primary" data-st="${prox}" data-id="${p.id}" style="width:auto">${rotuloStatus(prox)}</button>` : ""}
+                ${prox ? `<button class="btn-primary fit" data-st="${prox}" data-id="${p.id}">${rotuloStatus(prox)}</button>` : ""}
                 ${p.status !== "cancelado" && p.status !== "entregue" ? `<button class="btn-ghost" data-st="cancelado" data-id="${p.id}">Cancelar</button>` : ""}
               </div>
             </article>
@@ -413,7 +413,7 @@ export async function renderPainel(app, sessao) {
           <label>Número da mesa</label>
           <div class="toolbar" style="margin:8px 0 0">
             <input type="number" id="mesa-n" min="1" value="1">
-            <button class="btn-primary" id="btn-qr" type="button" style="width:auto">Gerar</button>
+            <button class="btn-primary fit" id="btn-qr" type="button">Gerar</button>
           </div>
           <p class="qr-link" id="qr-link"></p>
         </div>

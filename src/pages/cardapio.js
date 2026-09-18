@@ -215,13 +215,14 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
 
   function topoLoja(extra = "") {
     const aberto = !publico.pausado;
-    const canal = mesa ? `Mesa ${mesa}` : "Retirada";
     const min = String(publico.pedidoMinimoTexto || "").trim();
     const mostraMin = min && !/^sem pedido m[ií]nimo\.?$/i.test(min);
     const meta = [
-      aberto ? "Aberto agora" : "Fechado",
+      mesa ? `Mesa ${mesa}` : "Retirada",
+      aberto ? "Aberto" : "Fechado",
       publico.horarioTexto,
-      publico.endereco
+      aberto && publico.entregaTexto,
+      aberto && mostraMin ? min : ""
     ].filter(Boolean).join(" · ");
     return `
       <header class="store-head">
@@ -231,17 +232,12 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
             : `<div class="store-logo ph-logo">${esc(iniciais(publico.nome))}</div>`}
           <div class="store-meta">
             <h1>${esc(publico.nome || "Cardápio")}</h1>
-            <p class="store-end"><span class="store-status ${aberto ? "on" : "off"}"></span>${esc(meta)}</p>
+            <p class="store-end"><span class="store-status ${aberto ? "on" : "off"}"></span><span>${esc(meta)}</span></p>
           </div>
           <div class="store-tools">
             <button type="button" class="icon-btn" id="btn-busca" aria-label="Buscar">${ico.search}</button>
             ${wa ? `<a class="icon-btn wa" href="${esc(wa)}" target="_blank" rel="noopener" aria-label="WhatsApp">${ico.wa}</a>` : ""}
           </div>
-        </div>
-        <div class="store-sub">
-          <span class="canal ${mesa ? "mesa" : "retirada"}">${esc(canal)}</span>
-          ${aberto && publico.entregaTexto ? `<span class="chip-info">${esc(publico.entregaTexto)}</span>` : ""}
-          ${aberto && mostraMin ? `<span class="chip-info">${esc(min)}</span>` : ""}
         </div>
         ${extra}
       </header>
@@ -291,12 +287,11 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     }
     return `
       <article class="menu-item" data-open="${esc(p.id)}" role="button" tabindex="0">
-        <div class="menu-copy">
+        <div class="menu-copy${p.descricao ? "" : " short"}">
           ${p.destaque && !todosDestaque ? `<em class="fav">Mais pedido</em>` : ""}
           <h3>${esc(p.nome)}</h3>
           ${p.descricao ? `<p>${esc(p.descricao)}</p>` : ""}
           <strong>${esc(rotuloPreco(p))}</strong>
-          ${sanitizarGrupos(p.grupos).length ? `<em class="opts-hint">Toque para escolher</em>` : ""}
         </div>
         <div class="menu-media">${foto}<span class="add-dot">${ico.plus}</span></div>
       </article>
@@ -317,7 +312,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         <div class="store-search">
           <input type="search" id="menu-busca" placeholder="Buscar no cardápio" value="${esc(busca)}">
         </div>` : "",
-      cats.length ? `
+      cats.length > 1 ? `
         <nav class="cats" aria-label="Categorias">
           ${cats.map((c, i) => `<a href="#${idCategoria(c)}" class="${i === 0 ? "on" : ""}">${esc(c)}</a>`).join("")}
         </nav>` : ""
@@ -450,7 +445,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
                     <h2>${esc(g.nome)}</h2>
                     <small>${esc(regra)}</small>
                   </header>
-                  ${g.opcoes.length > 8 ? `<input type="search" class="opt-search" placeholder="Pesquisar em ${esc(g.nome)}" value="${esc(buscaExtra)}">` : ""}
+                  ${g.opcoes.length > 16 ? `<input type="search" class="opt-search" placeholder="Pesquisar em ${esc(g.nome)}" value="${esc(buscaExtra)}">` : ""}
                   ${ops.map((o) => {
                     const n = qtdOpcao(rascunho.extras, g.id, o.id);
                     const on = n > 0;
