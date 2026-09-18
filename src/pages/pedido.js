@@ -1,6 +1,6 @@
 import { escutarPedidoPublico } from "../lib/pedidos.js";
 import { brl, erroAmigavel, esc } from "../lib/format.js";
-import { ico } from "../lib/icons.js";
+import { CANAL_LOJA } from "../lib/loja.js";
 
 const PASSOS = [
   { id: "novo", label: "Enviado" },
@@ -43,7 +43,7 @@ export function renderPedido(app, { chave, pedidoId }) {
       </li>`;
     }).join("");
     const voltar = `/${chave}${pedido.numeroMesa ? `/mesa/${pedido.numeroMesa}` : ""}`;
-    const canal = pedido.tipo === "mesa" ? `Mesa ${pedido.numeroMesa}` : "Retirada no balcão";
+    const canal = pedido.tipo === "mesa" ? `Mesa ${pedido.numeroMesa}` : CANAL_LOJA;
     app.innerHTML = `
       <div class="menu-frame">
         <div class="menu-page track-page">

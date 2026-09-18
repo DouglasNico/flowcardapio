@@ -12,6 +12,11 @@ import {
   textoExtras,
   validarExtras
 } from "../lib/grupos.js";
+import { CANAL_LOJA } from "../lib/loja.js";
+
+function reduzMovimento() {
+  return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 function cartKey(chave, mesa) {
   return `flowpdv_cart_${chave}_${mesa || "retirada"}`;
@@ -69,6 +74,8 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   let buscaExtra = "";
   let carrinho = lerCarrinho(chave, mesa);
   let sheetAberto = false;
+  let animarItem = Boolean(itemId);
+  let fechandoItem = false;
   let rascunho = novoRascunho();
   const wa = linkWhatsapp(
     publico && publico.whatsapp,
@@ -107,18 +114,36 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     rascunho = novoRascunho();
     buscaExtra = "";
     sheetAberto = false;
+    animarItem = !reduzMovimento();
+    fechandoItem = false;
     const url = pathItem(id);
     if (location.pathname !== url) history.pushState({}, "", url);
     pintar();
-    window.scrollTo(0, 0);
   }
 
   function fecharItem() {
-    itemAtual = null;
-    rascunho = novoRascunho();
+    if (fechandoItem) return;
+    const overlay = app.querySelector("#prod-overlay");
     const url = pathLista();
-    if (location.pathname !== url) history.pushState({}, "", url);
-    pintar();
+    let done = false;
+    const concluir = () => {
+      if (done) return;
+      done = true;
+      fechandoItem = false;
+      itemAtual = null;
+      rascunho = novoRascunho();
+      if (location.pathname !== url) history.pushState({}, "", url);
+      pintarLista();
+    };
+    if (overlay && !reduzMovimento()) {
+      fechandoItem = true;
+      overlay.classList.remove("is-in");
+      overlay.classList.add("is-out");
+      overlay.addEventListener("animationend", concluir, { once: true });
+      setTimeout(() => { if (fechandoItem) concluir(); }, 380);
+      return;
+    }
+    concluir();
   }
 
   function setExtra(grupo, opcao, nextQtd) {
@@ -218,7 +243,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const min = String(publico.pedidoMinimoTexto || "").trim();
     const mostraMin = min && !/^sem pedido m[ií]nimo\.?$/i.test(min);
     const meta = [
-      mesa ? `Mesa ${mesa}` : "Retirada",
+      mesa ? `Mesa ${mesa}` : CANAL_LOJA,
       aberto ? "Aberto" : "Fechado",
       publico.horarioTexto,
       aberto && publico.entregaTexto,
@@ -287,13 +312,13 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     }
     return `
       <article class="menu-item" data-open="${esc(p.id)}" role="button" tabindex="0">
+        <div class="menu-media">${foto}<span class="add-dot">${ico.plus}</span></div>
         <div class="menu-copy${p.descricao ? "" : " short"}">
           ${p.destaque && !todosDestaque ? `<em class="fav">Mais pedido</em>` : ""}
           <h3>${esc(p.nome)}</h3>
           ${p.descricao ? `<p>${esc(p.descricao)}</p>` : ""}
           <strong>${esc(rotuloPreco(p))}</strong>
         </div>
-        <div class="menu-media">${foto}<span class="add-dot">${ico.plus}</span></div>
       </article>
     `;
   }
@@ -330,7 +355,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
           <div class="menu-list">
             ${q ? `
               <h2 class="sec-title">${lista.length ? "Resultados" : "Nada encontrado"}</h2>
-              ${lista.map((p) => cardProduto(p, false, todosDestaque)).join("")}
+              <div class="menu-sec">${lista.map((p) => cardProduto(p, false, todosDestaque)).join("")}</div>
             ` : cats.map((c) => {
               const itens = lista.filter((p) => (p.categoria || "Geral") === c);
               return `
@@ -358,12 +383,12 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
 
   function pintarSheet() {
     return `
-      <div class="sheet" id="sheet">
+      <div class="sheet is-in" id="sheet">
         <div class="sheet-card">
           <div class="sheet-grab"></div>
           <header class="sheet-head">
             <h2>Seu pedido</h2>
-            <p>${mesa ? `Mesa ${esc(String(mesa))}` : "Retirada no balcão"}</p>
+            <p>${mesa ? `Mesa ${esc(String(mesa))}` : CANAL_LOJA}</p>
           </header>
           ${carrinho.map((i) => {
             const p = produtos.find((x) => String(x.id) === String(i.id));
@@ -421,71 +446,83 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     let motivo = "";
     try { validarExtras(prod, rascunho.extras); }
     catch (err) { pode = false; motivo = err.message; }
+    const prev = app.querySelector(".prod-page");
+    const y = prev ? prev.scrollTop : 0;
+    const entrar = animarItem && !reduzMovimento();
+    animarItem = false;
 
     app.innerHTML = `
       <div class="menu-frame">
-        <div class="prod-page">
-          <button type="button" class="icon-btn back-float" id="btn-voltar" aria-label="Voltar">${ico.back}</button>
-          ${prod.fotoUrl ? `<img class="prod-hero" src="${esc(prod.fotoUrl)}" alt="">` : `<div class="prod-hero ph-hero">${ico.photo}</div>`}
-          <div class="prod-body">
-            <p class="prod-cat">${esc(prod.categoria || "")}</p>
-            <h1>${esc(prod.nome)}</h1>
-            ${prod.descricao ? `<p class="prod-desc">${esc(prod.descricao)}</p>` : ""}
-            <p class="prod-from">${mostraAPartirDe(prod) ? "A partir de " : ""}${brl(precoMinimo(prod))}</p>
-            ${grupos.length ? grupos.map((g) => {
-              const usados = qtdNoGrupo(rascunho.extras, g.id);
-              const q = buscaExtra.trim().toLowerCase();
-              const ops = q ? g.opcoes.filter((o) => `${o.nome} ${o.descricao || ""}`.toLowerCase().includes(q)) : g.opcoes;
-              const regra = g.tipo === "single"
-                ? (g.min ? "Obrigatório · escolha 1" : "Escolha 1")
-                : `${g.min ? `Mín. ${g.min} · ` : ""}até ${g.max || "livre"} · ${usados}/${g.max || "—"}`;
-              return `
-                <section class="opt-group">
-                  <header>
-                    <h2>${esc(g.nome)}</h2>
-                    <small>${esc(regra)}</small>
-                  </header>
-                  ${g.opcoes.length > 16 ? `<input type="search" class="opt-search" placeholder="Pesquisar em ${esc(g.nome)}" value="${esc(buscaExtra)}">` : ""}
-                  ${ops.map((o) => {
-                    const n = qtdOpcao(rascunho.extras, g.id, o.id);
-                    const on = n > 0;
-                    return `
-                      <div class="opt-row ${on ? "on" : ""}">
-                        <div>
-                          <strong>${esc(o.nome)}</strong>
-                          ${o.descricao ? `<small>${esc(o.descricao)}</small>` : ""}
-                          <em>${o.preco ? `+ ${brl(o.preco)}` : "Incluso"}</em>
-                        </div>
-                        ${g.tipo === "single"
-                          ? `<button type="button" class="opt-radio ${on ? "on" : ""}" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-single="${on ? 0 : 1}" aria-label="${esc(o.nome)}"></button>`
-                          : `<div class="qty mini">
-                              <button type="button" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-q="${n - 1}">−</button>
-                              <span>${n}</span>
-                              <button type="button" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-q="${n + 1}">+</button>
-                            </div>`}
-                      </div>`;
-                  }).join("") || `<p class="empty">Nenhuma opção nesta busca.</p>`}
-                </section>`;
-            }).join("") : ""}
-            <section class="opt-group">
-              <header><h2>Observações</h2><small>Opcional</small></header>
-              <textarea class="obs" id="obs-item" maxlength="180" placeholder="Ex.: sem cebola, ponto da carne, sem picles">${esc(rascunho.obs)}</textarea>
-            </section>
-          </div>
-          <div class="prod-footer">
-            <div class="qty">
-              <button type="button" id="qtd-menos">−</button>
-              <span>${rascunho.qtd}</span>
-              <button type="button" id="qtd-mais">+</button>
+        <div class="prod-overlay${entrar ? " is-in" : ""}" id="prod-overlay">
+          <div class="prod-page">
+            <button type="button" class="icon-btn back-float" id="btn-voltar" aria-label="Voltar">${ico.back}</button>
+            ${prod.fotoUrl ? `<img class="prod-hero" src="${esc(prod.fotoUrl)}" alt="">` : `<div class="prod-hero ph-hero">${ico.photo}</div>`}
+            <div class="prod-body">
+              <p class="prod-cat">${esc(prod.categoria || "")}</p>
+              <h1>${esc(prod.nome)}</h1>
+              ${prod.descricao ? `<p class="prod-desc">${esc(prod.descricao)}</p>` : ""}
+              <p class="prod-from">${mostraAPartirDe(prod) ? "A partir de " : ""}${brl(precoMinimo(prod))}</p>
+              ${grupos.length ? grupos.map((g) => {
+                const usados = qtdNoGrupo(rascunho.extras, g.id);
+                const q = buscaExtra.trim().toLowerCase();
+                const ops = q ? g.opcoes.filter((o) => `${o.nome} ${o.descricao || ""}`.toLowerCase().includes(q)) : g.opcoes;
+                const regra = g.tipo === "single"
+                  ? (g.min ? "Obrigatório · escolha 1" : "Escolha 1")
+                  : `${g.min ? `Mín. ${g.min} · ` : ""}até ${g.max || "livre"} · ${usados}/${g.max || "—"}`;
+                return `
+                  <section class="opt-group">
+                    <header>
+                      <h2>${esc(g.nome)}</h2>
+                      <small>${esc(regra)}</small>
+                    </header>
+                    ${g.opcoes.length > 16 ? `<input type="search" class="opt-search" placeholder="Pesquisar em ${esc(g.nome)}" value="${esc(buscaExtra)}">` : ""}
+                    ${ops.map((o) => {
+                      const n = qtdOpcao(rascunho.extras, g.id, o.id);
+                      const on = n > 0;
+                      return `
+                        <div class="opt-row ${on ? "on" : ""}">
+                          <div>
+                            <strong>${esc(o.nome)}</strong>
+                            ${o.descricao ? `<small>${esc(o.descricao)}</small>` : ""}
+                            <em>${o.preco ? `+ ${brl(o.preco)}` : "Incluso"}</em>
+                          </div>
+                          ${g.tipo === "single"
+                            ? `<button type="button" class="opt-radio ${on ? "on" : ""}" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-single="${on ? 0 : 1}" aria-label="${esc(o.nome)}"></button>`
+                            : `<div class="qty mini">
+                                <button type="button" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-q="${n - 1}">−</button>
+                                <span>${n}</span>
+                                <button type="button" data-g="${esc(g.id)}" data-o="${esc(o.id)}" data-q="${n + 1}">+</button>
+                              </div>`}
+                        </div>`;
+                    }).join("") || `<p class="empty">Nenhuma opção nesta busca.</p>`}
+                  </section>`;
+              }).join("") : ""}
+              <section class="opt-group">
+                <header><h2>Observações</h2><small>Opcional</small></header>
+                <textarea class="obs" id="obs-item" maxlength="180" placeholder="Ex.: sem cebola, ponto da carne, sem picles">${esc(rascunho.obs)}</textarea>
+              </section>
             </div>
-            <button class="btn-primary" id="btn-add" type="button" ${pode ? "" : "disabled"}>
-              Adicionar ${brl(tot)}
-            </button>
+            <div class="prod-footer">
+              ${!pode && motivo ? `<p class="prod-hint">${esc(motivo)}</p>` : ""}
+              <div class="qty">
+                <button type="button" id="qtd-menos">−</button>
+                <span>${rascunho.qtd}</span>
+                <button type="button" id="qtd-mais">+</button>
+              </div>
+              <button class="btn-primary" id="btn-add" type="button" ${pode ? "" : "disabled"}>
+                Adicionar ${brl(tot)}
+              </button>
+            </div>
           </div>
-          ${!pode && motivo ? `<p class="prod-hint">${esc(motivo)}</p>` : ""}
         </div>
       </div>
     `;
+
+    const page = app.querySelector(".prod-page");
+    if (page) page.scrollTop = y;
+    app.querySelector("#prod-overlay").addEventListener("click", (ev) => {
+      if (ev.target.id === "prod-overlay") fecharItem();
+    });
 
     app.querySelector("#btn-voltar").addEventListener("click", fecharItem);
     app.querySelector("#qtd-menos").addEventListener("click", () => {

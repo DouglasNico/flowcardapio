@@ -15,6 +15,18 @@ import { atualizarStatusPedido, escutarPedidosLoja, invalidarCardapioPublico } f
 import { brl, erroAmigavel, originPublico, esc, soDigitos, toast } from "../lib/format.js";
 import { sanitizarGrupos, textoExtras } from "../lib/grupos.js";
 import { abrirEditorGrupos } from "./painel-grupos.js";
+import {
+  CANAL_LOJA,
+  DIAS,
+  ENTREGA_PRESETS,
+  HORARIO_PRESETS,
+  MINIMO_PRESETS,
+  lerFormatoLoja,
+  patchLoja,
+  textoEntrega,
+  textoHorario,
+  textoMinimo
+} from "../lib/loja.js";
 
 function beep() {
   try {
@@ -173,50 +185,188 @@ export async function renderPainel(app, sessao) {
   }
 
   function pintarLoja() {
+    const form = lerFormatoLoja(config);
+    const pickDias = DIAS.map((d) => `
+      <button type="button" class="pick${form.dias.includes(d.id) ? " on" : ""}" data-dia="${d.id}">${d.curto}</button>
+    `).join("");
+    const pickHorario = HORARIO_PRESETS.map((p) => {
+      const on = p.abre === form.abre && p.fecha === form.fecha && p.dias.length === form.dias.length && p.dias.every((id) => form.dias.includes(id));
+      return `<button type="button" class="pick${on ? " on" : ""}" data-hpreset="${p.id}">${p.label}</button>`;
+    }).join("");
+    const pickEntrega = ENTREGA_PRESETS.map((p) => `
+      <button type="button" class="pick${form.entregaMin === p.min && form.entregaMax === p.max ? " on" : ""}" data-emin="${p.min}" data-emax="${p.max}">${p.min}–${p.max} min</button>
+    `).join("");
+    const pickMin = MINIMO_PRESETS.map((n) => `
+      <button type="button" class="pick${Number(form.pedidoMinimoValor) === n ? " on" : ""}" data-minimo="${n}">${n ? brl(n) : "Sem mínimo"}</button>
+    `).join("");
     main.innerHTML = `
       <section class="page-head">
         <div>
-          <h2>Dados da loja</h2>
-          <p>Isso aparece no topo do cardápio. Horário e WhatsApp atualizam na hora; produtos só depois de publicar.</p>
+          <h2>Loja no cardápio</h2>
+          <p>Toque nas opções. Horário, entrega e pedido mínimo montam o texto sozinhos e já aparecem no cardápio.</p>
         </div>
       </section>
-      <div class="card loja-card">
-        <div class="loja-grid">
-          <label>WhatsApp (com DDD)<input id="lj-wa" inputmode="numeric" placeholder="19999999999" value="${esc(config.whatsapp || "")}"></label>
-          <label>Endereço / bairro<input id="lj-end" placeholder="Jardim Santa Izabel, Hortolândia" value="${esc(config.endereco || "")}"></label>
-          <label>Horário<input id="lj-hora" placeholder="Ter a Dom · 18:00–23:00" value="${esc(config.horarioTexto || "")}"></label>
-          <label>Entrega<input id="lj-ent" placeholder="40–70 min" value="${esc(config.entregaTexto || "")}"></label>
-          <label>Pedido mínimo<input id="lj-min" placeholder="Sem pedido mínimo" value="${esc(config.pedidoMinimoTexto != null ? config.pedidoMinimoTexto : "Sem pedido mínimo")}"></label>
-        </div>
-        <div class="loja-foot">
-          <label class="switch">
+      <div class="loja-layout">
+        <div class="card loja-status-card">
+          <div>
+            <strong>${config.pausado ? "Cardápio pausado" : "Cardápio aberto"}</strong>
+            <p>${config.pausado ? "Clientes veem a loja fechada." : "Clientes podem pedir agora."}</p>
+          </div>
+          <label class="switch big">
             <input type="checkbox" id="pausado" ${config.pausado ? "checked" : ""}>
-            Pausar cardápio
+            ${config.pausado ? "Pausado" : "Aberto"}
           </label>
-          <button class="btn-primary fit" id="lj-salvar" type="button">Salvar</button>
+        </div>
+        <div class="card">
+          <h3>Funcionamento</h3>
+          <p class="loja-help">Escolha um atalho ou monte os dias e o horário.</p>
+          <div class="pick-row">${pickHorario}</div>
+          <div class="pick-row dias">${pickDias}</div>
+          <div class="loja-times">
+            <label>Abre<input type="time" id="lj-abre" value="${esc(form.abre)}"></label>
+            <label>Fecha<input type="time" id="lj-fecha" value="${esc(form.fecha)}"></label>
+          </div>
+          <p class="loja-preview-line" id="lj-hora-preview">${esc(textoHorario(form.dias, form.abre, form.fecha) || "Selecione os dias")}</p>
+        </div>
+        <div class="card">
+          <h3>Tempo de entrega</h3>
+          <p class="loja-help">Quanto o cliente espera, do pedido até sair.</p>
+          <div class="pick-row">${pickEntrega}</div>
+          <p class="loja-preview-line" id="lj-ent-preview">${esc(textoEntrega(form.entregaMin, form.entregaMax))}</p>
+        </div>
+        <div class="card">
+          <h3>Pedido mínimo</h3>
+          <div class="pick-row">${pickMin}</div>
+          <label class="loja-min-extra">Outro valor (R$)
+            <input type="number" id="lj-min-val" min="0" step="1" value="${form.pedidoMinimoValor || ""}" placeholder="0">
+          </label>
+          <p class="loja-preview-line" id="lj-min-preview">${esc(textoMinimo(form.pedidoMinimoValor))}</p>
+        </div>
+        <div class="card">
+          <h3>WhatsApp e endereço</h3>
+          <div class="loja-grid">
+            <label>WhatsApp (DDD + número)<input id="lj-wa" inputmode="numeric" placeholder="19999999999" value="${esc(config.whatsapp || "")}"></label>
+            <label>Bairro / endereço<input id="lj-end" placeholder="Jardim Santa Izabel, Hortolândia" value="${esc(config.endereco || "")}"></label>
+          </div>
+          <div class="loja-foot">
+            <span class="loja-saved" id="lj-saved"></span>
+            <button class="btn-primary fit" id="lj-salvar" type="button">Salvar contato</button>
+          </div>
         </div>
       </div>
     `;
+
+    const saved = main.querySelector("#lj-saved");
+    const horaPrev = main.querySelector("#lj-hora-preview");
+    const entPrev = main.querySelector("#lj-ent-preview");
+    const minPrev = main.querySelector("#lj-min-preview");
+
+    function estadoForm() {
+      const dias = [...main.querySelectorAll("[data-dia].on")].map((b) => b.dataset.dia);
+      return {
+        dias,
+        abre: main.querySelector("#lj-abre").value || "18:00",
+        fecha: main.querySelector("#lj-fecha").value || "23:00",
+        entregaMin: Number((main.querySelector("[data-emin].on") || {}).dataset.emin) || form.entregaMin,
+        entregaMax: Number((main.querySelector("[data-emin].on") || {}).dataset.emax) || form.entregaMax,
+        pedidoMinimoValor: Number(main.querySelector("#lj-min-val").value) || 0
+      };
+    }
+
+    function pintarPrevia() {
+      const st = estadoForm();
+      horaPrev.textContent = textoHorario(st.dias, st.abre, st.fecha) || "Selecione os dias";
+      entPrev.textContent = textoEntrega(st.entregaMin, st.entregaMax);
+      minPrev.textContent = textoMinimo(st.pedidoMinimoValor);
+    }
+
+    async function salvarHorario() {
+      const st = estadoForm();
+      if (!st.dias.length) {
+        toast("Escolha pelo menos um dia.");
+        return;
+      }
+      const patch = patchLoja(st);
+      try {
+        await salvarConfig(chave, patch);
+        Object.assign(config, patch);
+        saved.textContent = "Atualizado no cardápio";
+        pintarPrevia();
+      } catch (err) {
+        toast(erroAmigavel(err));
+      }
+    }
+
     main.querySelector("#pausado").addEventListener("change", async (ev) => {
       config.pausado = ev.target.checked;
       try {
         await salvarConfig(chave, { pausado: config.pausado });
         toast(config.pausado ? "Cardápio pausado." : "Cardápio aberto.");
+        pintarLoja();
       } catch (err) { toast(erroAmigavel(err)); }
+    });
+
+    main.querySelectorAll("[data-hpreset]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const p = HORARIO_PRESETS.find((x) => x.id === btn.dataset.hpreset);
+        if (!p) return;
+        main.querySelectorAll("[data-dia]").forEach((d) => d.classList.toggle("on", p.dias.includes(d.dataset.dia)));
+        main.querySelector("#lj-abre").value = p.abre;
+        main.querySelector("#lj-fecha").value = p.fecha;
+        main.querySelectorAll("[data-hpreset]").forEach((b) => b.classList.toggle("on", b === btn));
+        pintarPrevia();
+        salvarHorario();
+      });
+    });
+    main.querySelectorAll("[data-dia]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        btn.classList.toggle("on");
+        main.querySelectorAll("[data-hpreset]").forEach((b) => b.classList.remove("on"));
+        pintarPrevia();
+        salvarHorario();
+      });
+    });
+    ["#lj-abre", "#lj-fecha"].forEach((sel) => {
+      main.querySelector(sel).addEventListener("change", () => {
+        main.querySelectorAll("[data-hpreset]").forEach((b) => b.classList.remove("on"));
+        pintarPrevia();
+        salvarHorario();
+      });
+    });
+    main.querySelectorAll("[data-emin]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        main.querySelectorAll("[data-emin]").forEach((b) => b.classList.toggle("on", b === btn));
+        form.entregaMin = Number(btn.dataset.emin);
+        form.entregaMax = Number(btn.dataset.emax);
+        pintarPrevia();
+        salvarHorario();
+      });
+    });
+    main.querySelectorAll("[data-minimo]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        main.querySelector("#lj-min-val").value = btn.dataset.minimo === "0" ? "" : btn.dataset.minimo;
+        main.querySelectorAll("[data-minimo]").forEach((b) => b.classList.toggle("on", b === btn));
+        pintarPrevia();
+        salvarHorario();
+      });
+    });
+    main.querySelector("#lj-min-val").addEventListener("change", () => {
+      const n = Number(main.querySelector("#lj-min-val").value) || 0;
+      main.querySelectorAll("[data-minimo]").forEach((b) => b.classList.toggle("on", Number(b.dataset.minimo) === n));
+      pintarPrevia();
+      salvarHorario();
     });
     main.querySelector("#lj-salvar").addEventListener("click", async (ev) => {
       ev.target.disabled = true;
-      const patch = {
-        whatsapp: soDigitos(main.querySelector("#lj-wa").value),
-        endereco: main.querySelector("#lj-end").value.trim().slice(0, 120),
-        horarioTexto: main.querySelector("#lj-hora").value.trim().slice(0, 80),
-        entregaTexto: main.querySelector("#lj-ent").value.trim().slice(0, 80),
-        pedidoMinimoTexto: main.querySelector("#lj-min").value.trim().slice(0, 60)
-      };
       try {
+        const patch = {
+          whatsapp: soDigitos(main.querySelector("#lj-wa").value),
+          endereco: main.querySelector("#lj-end").value.trim().slice(0, 120)
+        };
         await salvarConfig(chave, patch);
         Object.assign(config, patch);
-        toast("Dados da loja salvos.");
+        saved.textContent = "Contato salvo";
+        toast("WhatsApp e endereço salvos.");
       } catch (err) {
         toast(erroAmigavel(err));
       } finally {
@@ -360,7 +510,7 @@ export async function renderPainel(app, sessao) {
   function pintarPedidos() {
     garantirPedidos();
     if (!pedidos.length) {
-      main.innerHTML = `<div class="empty-card"><h2>Nenhum pedido ainda</h2><p>Publique o cardápio e teste o QR da mesa ou o link de retirada.</p></div>`;
+      main.innerHTML = `<div class="empty-card"><h2>Nenhum pedido ainda</h2><p>Publique o cardápio e teste o QR da mesa ou o link de ${CANAL_LOJA.toLowerCase()}.</p></div>`;
       return;
     }
     main.innerHTML = `
@@ -369,7 +519,7 @@ export async function renderPainel(app, sessao) {
         ${pedidos.map((p) => {
           const prox = proximoStatus(p.status);
           const itens = (p.itens || []).map((i) => `<li>${linhaPedidoItem(i)}</li>`).join("");
-          const onde = p.tipo === "mesa" ? `Mesa ${p.numeroMesa}` : "Retirada";
+          const onde = p.tipo === "mesa" ? `Mesa ${p.numeroMesa}` : CANAL_LOJA;
           return `
             <article class="pedido">
               <header>
@@ -404,7 +554,7 @@ export async function renderPainel(app, sessao) {
       <section class="page-head">
         <div>
           <h2>QR e links</h2>
-          <p>Cole o QR na mesa. O link da loja é a retirada no balcão.</p>
+          <p>Cole o QR na mesa. O link da loja é ${CANAL_LOJA}.</p>
         </div>
       </section>
       <div class="qr-grid">
@@ -419,7 +569,7 @@ export async function renderPainel(app, sessao) {
         </div>
         <div class="card qr-preview" id="qr-box"><p class="empty">Gere o QR da mesa.</p></div>
         <div class="card">
-          <h3>Retirada</h3>
+          <h3>${CANAL_LOJA}</h3>
           <p class="qr-link">${esc(urlLoja)}</p>
           <div id="qr-loja"></div>
         </div>
