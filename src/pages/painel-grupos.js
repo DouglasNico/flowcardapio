@@ -80,13 +80,17 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
 
   const wrap = document.createElement("div");
   wrap.className = "modal";
-  document.documentElement.classList.add("is-locked");
+  const html = document.documentElement;
+  const gap = Math.max(0, window.innerWidth - html.clientWidth);
+  html.style.setProperty("--lock-gap", `${gap}px`);
+  html.classList.add("is-locked");
   document.body.classList.add("is-locked");
   document.body.appendChild(wrap);
 
   function fechar() {
-    document.documentElement.classList.remove("is-locked");
+    html.classList.remove("is-locked");
     document.body.classList.remove("is-locked");
+    html.style.removeProperty("--lock-gap");
     wrap.remove();
     if (onClose) onClose();
   }

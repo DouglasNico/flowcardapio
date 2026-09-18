@@ -84,8 +84,24 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   let pularScroll = false;
 
   function travarFundo(on) {
-    document.documentElement.classList.toggle("is-locked", Boolean(on));
-    document.body.classList.toggle("is-locked", Boolean(on));
+    const html = document.documentElement;
+    const body = document.body;
+    if (on) {
+      if (!body.classList.contains("is-locked")) {
+        const gap = Math.max(0, window.innerWidth - html.clientWidth);
+        html.style.setProperty("--lock-gap", `${gap}px`);
+      }
+      html.classList.add("is-locked");
+      body.classList.add("is-locked");
+    } else {
+      html.classList.remove("is-locked");
+      body.classList.remove("is-locked");
+      html.style.removeProperty("--lock-gap");
+    }
+  }
+
+  function overlayEl() {
+    return document.getElementById("prod-overlay");
   }
 
   let itemUi = null;
@@ -103,7 +119,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   }
 
   function atualizarProdutoAberto() {
-    const overlay = app.querySelector("#prod-overlay");
+    const overlay = overlayEl();
     if (!overlay || !itemUi) return;
     const { grupos, tot, pode, precisa, foco } = itemUi;
     const body = overlay.querySelector(".prod-body");
@@ -203,7 +219,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
 
   function fecharItem() {
     if (fechandoItem) return;
-    const overlay = app.querySelector("#prod-overlay");
+    const overlay = overlayEl();
     const url = pathLista();
     let done = false;
     const concluir = () => {
@@ -214,6 +230,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       rascunho = novoRascunho();
       if (location.pathname !== url) history.pushState({}, "", url);
       travarFundo(false);
+      if (overlay && overlay.parentNode) overlay.remove();
       pintarLista();
     };
     if (overlay && !reduzMovimento()) {
@@ -613,7 +630,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     if (!grupoAberto) grupoAberto = pendente ? pendente.id : (grupos[0] && grupos[0].id);
     const foco = String(grupoAberto || "");
     itemUi = { grupos, tot, pode, motivo, pendente, precisa, foco };
-    const overlayAtual = app.querySelector("#prod-overlay");
+    const overlayAtual = overlayEl();
     const entrar = animarItem && !reduzMovimento();
     animarItem = false;
     if (overlayAtual && overlayAtual.dataset.item === String(prod.id) && !entrar) {
@@ -622,9 +639,14 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       return;
     }
 
-    app.innerHTML = `
-      <div class="menu-frame">
-        <div class="prod-overlay${entrar ? " is-in" : ""}" id="prod-overlay">
+    let overlay = overlayAtual;
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "prod-overlay";
+      document.body.appendChild(overlay);
+    }
+    overlay.className = `prod-overlay${entrar ? " is-in" : ""}`;
+    overlay.innerHTML = `
           <div class="prod-page">
             <button type="button" class="icon-btn back-float" id="btn-voltar" aria-label="Voltar">${ico.back}</button>
             ${prod.fotoUrl ? `<img class="prod-hero" src="${esc(prod.fotoUrl)}" alt="">` : `<div class="prod-hero ph-hero">${ico.photo}</div>`}
@@ -697,11 +719,8 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
               </button>
             </div>
           </div>
-        </div>
-      </div>
     `;
 
-    const overlay = app.querySelector("#prod-overlay");
     overlay.dataset.item = String(prod.id);
     travarFundo(true);
     if (pularScroll) {
@@ -711,25 +730,28 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         if (el) el.scrollIntoView({ block: "nearest", behavior: reduzMovimento() ? "auto" : "smooth" });
       });
     }
-    overlay.addEventListener("click", (ev) => {
-      if (ev.target.id === "prod-overlay") fecharItem();
-    });
+    if (!overlay.dataset.bound) {
+      overlay.dataset.bound = "1";
+      overlay.addEventListener("click", (ev) => {
+        if (ev.target.id === "prod-overlay") fecharItem();
+      });
+    }
 
-    app.querySelector("#btn-voltar").addEventListener("click", fecharItem);
-    app.querySelector("#qtd-menos").addEventListener("click", () => {
+    overlay.querySelector("#btn-voltar").addEventListener("click", fecharItem);
+    overlay.querySelector("#qtd-menos").addEventListener("click", () => {
       rascunho.qtd = Math.max(1, rascunho.qtd - 1);
       pintar();
     });
-    app.querySelector("#qtd-mais").addEventListener("click", () => {
+    overlay.querySelector("#qtd-mais").addEventListener("click", () => {
       rascunho.qtd = Math.min(99, rascunho.qtd + 1);
       pintar();
     });
-    const obs = app.querySelector("#obs-item");
+    const obs = overlay.querySelector("#obs-item");
     if (obs) obs.addEventListener("input", () => { rascunho.obs = obs.value; });
-    app.querySelectorAll(".opt-search").forEach((el) => {
+    overlay.querySelectorAll(".opt-search").forEach((el) => {
       el.addEventListener("input", () => { buscaExtra = el.value; pintar(); });
     });
-    app.querySelectorAll("[data-toggle-g]").forEach((btn) => {
+    overlay.querySelectorAll("[data-toggle-g]").forEach((btn) => {
       btn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         const id = btn.dataset.toggleG;
@@ -744,7 +766,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         pintar();
       });
     });
-    app.querySelectorAll("[data-open-g]").forEach((btn) => {
+    overlay.querySelectorAll("[data-open-g]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const id = btn.dataset.openG;
         const g = (itemUi && itemUi.grupos || []).find((x) => String(x.id) === String(id));
@@ -753,7 +775,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         pintar();
       });
     });
-    app.querySelectorAll("button[data-g][data-o]").forEach((btn) => {
+    overlay.querySelectorAll("button[data-g][data-o]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const gruposNow = (itemUi && itemUi.grupos) || [];
         const g = gruposNow.find((x) => String(x.id) === String(btn.dataset.g));
@@ -766,7 +788,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         }
       });
     });
-    app.querySelector("#btn-add").addEventListener("click", () => {
+    overlay.querySelector("#btn-add").addEventListener("click", () => {
       const ui = itemUi || {};
       if (!ui.pode) {
         if (ui.pendente) {
@@ -774,7 +796,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
           if (ui.pendente.min <= 0) rascunho.ativos[ui.pendente.id] = true;
           pintar();
           requestAnimationFrame(() => {
-            const el = app.querySelector(`[data-open-g="${ui.pendente.id}"]`);
+            const el = overlay.querySelector(`[data-open-g="${ui.pendente.id}"]`);
             if (el) el.scrollIntoView({ block: "center", behavior: reduzMovimento() ? "auto" : "smooth" });
           });
         }
@@ -867,8 +889,18 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   }
 
   function pintar() {
-    if (itemAtual) pintarProduto();
-    else pintarLista();
+    if (itemAtual) {
+      if (!app.querySelector(".menu-page")) pintarLista();
+      else {
+        const sheet = app.querySelector("#sheet");
+        if (sheet) sheet.remove();
+      }
+      pintarProduto();
+      return;
+    }
+    const overlay = overlayEl();
+    if (overlay) overlay.remove();
+    pintarLista();
   }
 
   pintar();
