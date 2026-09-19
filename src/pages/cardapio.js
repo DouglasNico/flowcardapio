@@ -467,17 +467,21 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const todosDestaque = produtos.length > 0 && destaquesAll.length >= produtos.length;
     const destaques = (!q && !todosDestaque) ? destaquesAll.slice(0, 8) : [];
     const cats = q ? [] : [...new Set(lista.map((p) => p.categoria || "Geral"))];
+    const idMais = "cat-mais-pedidos";
+    const abas = [
+      ...(destaques.length ? [["Mais pedidos", idMais]] : []),
+      ...cats.map((c) => [c, idCategoria(c)])
+    ];
     const extraTopo = [
       buscaAberta || q ? `
         <div class="store-search">
           <input type="search" id="menu-busca" placeholder="Buscar no cardápio" value="${esc(busca)}">
         </div>` : "",
-      cats.length > 1 ? `
+      abas.length > 1 ? `
         <nav class="cats" aria-label="Categorias">
-          ${cats.map((c, i) => {
-            const id = idCategoria(c);
+          ${abas.map(([nome, id], i) => {
             const on = catAtiva ? catAtiva === id : i === 0;
-            return `<button type="button" class="${on ? "on" : ""}" data-cat="${id}">${esc(c)}</button>`;
+            return `<button type="button" class="${on ? "on" : ""}" data-cat="${id}">${esc(nome)}</button>`;
           }).join("")}
         </nav>` : ""
     ].join("");
@@ -487,7 +491,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         <div class="menu-page ${nItens() ? "has-cart" : ""}">
           ${topoLoja(extraTopo)}
           ${destaques.length ? `
-            <section class="spot-wrap">
+            <section class="spot-wrap" id="${idMais}">
               <h2>Mais pedidos</h2>
               <div class="spot-row">${destaques.map((p) => cardProduto(p, true, todosDestaque)).join("")}</div>
             </section>` : ""}
@@ -685,7 +689,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
                         const on = n > 0;
                         const hide = q && !`${o.nome} ${o.descricao || ""}`.toLowerCase().includes(q);
                         return `
-                          <div class="opt-row ${on ? "on" : ""}" data-g="${esc(g.id)}" data-o="${esc(o.id)}"${hide ? " hidden" : ""}>
+                          <div class="opt-row ${on ? "on" : ""}" data-g="${esc(g.id)}" data-o="${esc(o.id)}" role="button" tabindex="0"${hide ? " hidden" : ""}>
                             <div>
                               <strong>${esc(o.nome)}</strong>
                               ${o.descricao ? `<small>${esc(o.descricao)}</small>` : ""}
@@ -775,16 +779,41 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         pintar();
       });
     });
+    function aplicarOpcao(gId, oId, single, delta) {
+      const gruposNow = (itemUi && itemUi.grupos) || [];
+      const g = gruposNow.find((x) => String(x.id) === String(gId));
+      const o = g && g.opcoes.find((x) => String(x.id) === String(oId));
+      if (!g || !o) return;
+      if (single != null) setExtra(g, o, Number(single), gruposNow);
+      else if (delta != null) {
+        const n = qtdOpcao(rascunho.extras, g.id, o.id);
+        setExtra(g, o, n + Number(delta), gruposNow);
+      }
+    }
     overlay.querySelectorAll("button[data-g][data-o]").forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        aplicarOpcao(btn.dataset.g, btn.dataset.o, btn.dataset.single, btn.dataset.delta);
+      });
+    });
+    overlay.querySelectorAll(".opt-row[data-g][data-o]").forEach((row) => {
+      const escolher = () => {
         const gruposNow = (itemUi && itemUi.grupos) || [];
-        const g = gruposNow.find((x) => String(x.id) === String(btn.dataset.g));
-        const o = g && g.opcoes.find((x) => String(x.id) === String(btn.dataset.o));
+        const g = gruposNow.find((x) => String(x.id) === String(row.dataset.g));
+        const o = g && g.opcoes.find((x) => String(x.id) === String(row.dataset.o));
         if (!g || !o) return;
-        if (btn.dataset.single != null) setExtra(g, o, Number(btn.dataset.single), gruposNow);
-        else if (btn.dataset.delta != null) {
-          const n = qtdOpcao(rascunho.extras, g.id, o.id);
-          setExtra(g, o, n + Number(btn.dataset.delta), gruposNow);
+        const n = qtdOpcao(rascunho.extras, g.id, o.id);
+        if (g.tipo === "single") setExtra(g, o, n ? 0 : 1, gruposNow);
+        else if (!n) setExtra(g, o, 1, gruposNow);
+      };
+      row.addEventListener("click", (ev) => {
+        if (ev.target.closest("button, .qty")) return;
+        escolher();
+      });
+      row.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          escolher();
         }
       });
     });

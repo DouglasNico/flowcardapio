@@ -450,13 +450,16 @@ export async function renderPainel(app, sessao) {
             </div>
             <div class="cat">${esc(p.categoria || "Geral")}${nOp ? ` · ${nOp} grupo${nOp > 1 ? "s" : ""} de opção` : ""}${ov.destaque ? " · Destaque" : ""}</div>
             <textarea data-desc placeholder="Descrição que o cliente lê no cardápio"></textarea>
-            <div class="chip-row">
-              <label class="chip${ov.visivel ? " on" : ""}"><input type="checkbox" data-visivel ${ov.visivel ? "checked" : ""}> No cardápio</label>
-              <label class="chip${ov.destaque ? " on" : ""}"><input type="checkbox" data-destaque ${ov.destaque ? "checked" : ""}> Mais pedido</label>
-              <label class="chip warn${ov.esgotado ? " on" : ""}"><input type="checkbox" data-esgotado ${ov.esgotado ? "checked" : ""}> Esgotado</label>
-            </div>
-            <div class="prod-card-actions">
-              <button type="button" class="btn-ghost" data-opcoes>Opções${nOp ? ` (${nOp})` : ""}</button>
+            <div class="prod-card-foot">
+              <div class="chip-row">
+                <label class="chip${ov.visivel ? " on" : ""}"><input type="checkbox" data-visivel ${ov.visivel ? "checked" : ""}> No cardápio</label>
+                <label class="chip${ov.destaque ? " on" : ""}"><input type="checkbox" data-destaque ${ov.destaque ? "checked" : ""}> Mais pedido</label>
+                <label class="chip warn${ov.esgotado ? " on" : ""}"><input type="checkbox" data-esgotado ${ov.esgotado ? "checked" : ""}> Esgotado</label>
+              </div>
+              <div class="prod-card-actions">
+                <label class="btn-ghost file-btn">Foto<input type="file" accept="image/jpeg,image/png,image/webp"></label>
+                <button type="button" class="btn-ghost" data-opcoes>Opções${nOp ? ` (${nOp})` : ""}</button>
+              </div>
             </div>
           </div>
         </article>
@@ -470,10 +473,12 @@ export async function renderPainel(app, sessao) {
       row.querySelector("[data-visivel]").addEventListener("change", (ev) => patchOverlay(id, { visivel: ev.target.checked }));
       row.querySelector("[data-destaque]").addEventListener("change", (ev) => patchOverlay(id, { destaque: ev.target.checked }));
       row.querySelector("[data-esgotado]").addEventListener("change", (ev) => patchOverlay(id, { esgotado: ev.target.checked }));
-      row.querySelector('input[type="file"]').addEventListener("change", (ev) => {
-        const file = ev.target.files && ev.target.files[0];
-        onFoto(id, file);
-        ev.target.value = "";
+      row.querySelectorAll('input[type="file"]').forEach((inp) => {
+        inp.addEventListener("change", (ev) => {
+          const file = ev.target.files && ev.target.files[0];
+          onFoto(id, file);
+          ev.target.value = "";
+        });
       });
       const del = row.querySelector("[data-del-foto]");
       if (del) del.addEventListener("click", () => onRemoverFoto(id));
