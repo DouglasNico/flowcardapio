@@ -1,3 +1,4 @@
+import { ico } from "../lib/icons.js";
 import { esc, toast } from "../lib/format.js";
 import { novoId, sanitizarGrupos, ordenarGrupos } from "../lib/grupos.js";
 import { precoProduto } from "../lib/backup.js";
@@ -153,7 +154,7 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
           <div class="ed-opt" data-oi="${oi}">
             <input data-onome placeholder="Nome da opção" value="${esc(o.nome || "")}">
             <label class="ed-preco">R$ <input type="number" step="0.01" min="0" data-opreco value="${o.preco || 0}"></label>
-            <button type="button" class="icon-btn" data-del-o aria-label="Apagar opção">✕</button>
+            <button type="button" class="icon-btn" data-del-o aria-label="Apagar opção">${ico.close}</button>
           </div>
         `).join("")}
         <div class="ed-opt-actions">
@@ -257,7 +258,7 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
           <h2 id="ed-titulo">Opções do item</h2>
           <p>${esc(produto.nome || "")}</p>
         </div>
-        <button type="button" class="icon-btn" id="ed-fechar" aria-label="Fechar">✕</button>
+        <button type="button" class="icon-btn" id="ed-fechar" aria-label="Fechar">${ico.close}</button>
       </header>
       <p class="editor-help">Isso aparece quando o cliente toca no lanche. Salvar já atualiza o cardápio público.</p>
       <div class="editor-templates">

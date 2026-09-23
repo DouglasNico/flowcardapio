@@ -608,7 +608,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     if (prod.esgotado) {
       app.innerHTML = `
         <div class="menu-frame"><div class="menu-page">
-          <button type="button" class="back-link" id="btn-voltar">← Cardápio</button>
+          <button type="button" class="back-link" id="btn-voltar">${ico.back} Cardápio</button>
           <div class="closed-box"><h2>${esc(prod.nome)}</h2><p>Item esgotado no momento.</p></div>
         </div></div>`;
       app.querySelector("#btn-voltar").addEventListener("click", fecharItem);

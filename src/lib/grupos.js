@@ -1,3 +1,4 @@
+import { ico } from "./icons.js";
 export function novoId(prefixo = "id") {
   return `${prefixo}-${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -185,17 +186,17 @@ export function textoExtras(extras) {
 
 export function iconeCategoria(nome) {
   const c = String(nome || "").toLowerCase();
-  if (c.includes("lanche") || c.includes("sandu") || c.includes("burger") || c.includes("hambur")) return "🍔";
-  if (c.includes("pizza")) return "🍕";
-  if (c.includes("hot") || c.includes("dog")) return "🌭";
-  if (c.includes("porç") || c.includes("porc") || c.includes("petisc") || c.includes("frita")) return "🍟";
-  if (c.includes("sobremes") || c.includes("sorvete") || c.includes("açaí") || c.includes("acai")) return "🍰";
-  if (c.includes("adicion") || c.includes("extra") || c.includes("complem")) return "🥓";
-  if (c.includes("combo") || c.includes("kit") || c.includes("promo")) return "🍱";
-  if (c.includes("suco")) return "🧃";
-  if (c.includes("cerveja") || c.includes("chopp")) return "🍺";
-  if (c.includes("bebida") || c.includes("refri") || c.includes("água") || c.includes("agua")) return "🥤";
-  return "🍽️";
+  if (c.includes("lanche") || c.includes("sandu") || c.includes("burger") || c.includes("hambur")) return ico.burger;
+  if (c.includes("pizza")) return ico.food;
+  if (c.includes("hot") || c.includes("dog")) return ico.food;
+  if (c.includes("porç") || c.includes("porc") || c.includes("petisc") || c.includes("frita")) return ico.food;
+  if (c.includes("sobremes") || c.includes("sorvete") || c.includes("açaí") || c.includes("acai")) return ico.food;
+  if (c.includes("adicion") || c.includes("extra") || c.includes("complem")) return ico.food;
+  if (c.includes("combo") || c.includes("kit") || c.includes("promo")) return ico.bag;
+  if (c.includes("suco")) return ico.drink;
+  if (c.includes("cerveja") || c.includes("chopp")) return ico.drink;
+  if (c.includes("bebida") || c.includes("refri") || c.includes("água") || c.includes("agua")) return ico.drink;
+  return ico.food;
 }
 
 export function idCategoria(nome) {

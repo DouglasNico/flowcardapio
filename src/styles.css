@@ -969,3 +969,5 @@ body.is-locked { padding-right: var(--lock-gap, 0px); }
     animation: none !important; transition: none !important;
   }
 }
+
+.back-link{display:inline-flex;align-items:center;gap:6px}.back-link svg{width:18px;height:18px;flex:none}
