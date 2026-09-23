@@ -76,6 +76,30 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   let itemAtual = itemId ? String(itemId) : null;
   let busca = "";
   let buscaAberta = true;
+  let focarBusca = false;
+  let scrollBusca = window.scrollY;
+  let pausaBusca = 0;
+
+  function atualizarBusca() {
+    const area = app.querySelector('.store-search');
+    const aberta = buscaAberta || Boolean(busca.trim());
+    area?.classList.toggle('is-collapsed', !aberta);
+    if (area) area.inert = !aberta;
+    app.querySelector('#btn-busca')?.setAttribute('aria-expanded', String(aberta));
+  }
+
+  function acompanharBusca() {
+    const y = window.scrollY, delta = y - scrollBusca;
+    if (itemAtual || sheetAberto || busca.trim() || document.activeElement?.id === 'menu-busca' || performance.now() < pausaBusca) { scrollBusca = y; return; }
+    if (Math.abs(delta) <= 8 && y >= 80) return;
+    scrollBusca = y;
+    const aberta = y < 80 || delta < -8 ? true : y > 180 && delta > 8 ? false : buscaAberta;
+    if (aberta !== buscaAberta) {
+      buscaAberta = aberta;
+      pausaBusca = performance.now() + 280;
+      atualizarBusca();
+    }
+  }
   let buscaExtra = "";
   let carrinho = lerCarrinho(chave, mesa);
   let sheetAberto = false;
@@ -94,7 +118,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const body = document.body;
     if (on) {
       if (!body.classList.contains("is-locked")) {
-        const gap = Math.max(0, window.innerWidth - html.clientWidth);
+        const gap = CSS.supports("scrollbar-gutter: stable") ? 0 : Math.max(0, window.innerWidth - html.clientWidth);
         html.style.setProperty("--lock-gap", `${gap}px`);
       }
       html.classList.add("is-locked");
@@ -491,10 +515,9 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       ...cats.map((c) => [c, idCategoria(c)])
     ];
     const extraTopo = [
-      buscaAberta || q ? `
-        <div class="store-search">
-          <input aria-label="Buscar no cardápio" type="search" id="menu-busca" placeholder="Buscar no cardápio" value="${esc(busca)}">
-        </div>` : "",
+      `<div class="store-search${buscaAberta || q ? '' : ' is-collapsed'}" id="store-search" ${buscaAberta || q ? '' : 'inert'}>
+          <div class="store-search-inner"><input aria-label="Buscar no cardápio" type="search" id="menu-busca" placeholder="Buscar no cardápio" value="${esc(busca)}"></div>
+        </div>`,
       abas.length > 1 ? `
         <nav class="cats" aria-label="Categorias">
           ${abas.map(([nome, id], i) => {
@@ -860,21 +883,25 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   function bindLista() {
     const buscaEl = app.querySelector("#menu-busca");
     if (buscaEl) {
-      buscaEl.addEventListener("input", () => { busca = buscaEl.value; pintar(); });
-      if (buscaAberta && document.activeElement !== buscaEl) {
+      buscaEl.addEventListener("input", () => { busca = buscaEl.value; focarBusca = true; pintar(); });
+      if (focarBusca && !sheetAberto) {
+        focarBusca = false;
         const pos = buscaEl.value.length;
-        buscaEl.focus();
+        buscaEl.focus({preventScroll:true});
         buscaEl.setSelectionRange(pos, pos);
       }
     }
     const btnBusca = app.querySelector("#btn-busca");
     if (btnBusca) {
       btnBusca.addEventListener("click", () => {
-        buscaAberta = !buscaAberta;
-        if (!buscaAberta) busca = "";
-        pintar();
+        buscaAberta = !buscaAberta || Boolean(busca.trim());
+        pausaBusca = performance.now() + 280;
+        atualizarBusca();
+        if (buscaAberta) buscaEl?.focus({preventScroll:true});
       });
     }
+    btnBusca?.setAttribute('aria-controls', 'store-search');
+    atualizarBusca();
     limparCategorias();
     limparCategorias = acompanharCategorias(app, {
       aoAtivar: id => { catAtiva = id; }, movimentoReduzido: reduzMovimento
@@ -959,5 +986,6 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   }
 
   pintar();
-  return () => { limparCategorias(); overlayEl()?.remove(); travarFundo(false); };
+  window.addEventListener('scroll', acompanharBusca, {passive:true});
+  return () => { window.removeEventListener('scroll', acompanharBusca); limparCategorias(); overlayEl()?.remove(); travarFundo(false); };
 }

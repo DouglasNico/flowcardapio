@@ -83,7 +83,7 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
   const wrap = document.createElement("div");
   wrap.className = "modal";
   const html = document.documentElement;
-  const gap = Math.max(0, window.innerWidth - html.clientWidth);
+  const gap = CSS.supports("scrollbar-gutter: stable") ? 0 : Math.max(0, window.innerWidth - html.clientWidth);
   html.style.setProperty("--lock-gap", `${gap}px`);
   html.classList.add("is-locked");
   document.body.classList.add("is-locked");
