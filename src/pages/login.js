@@ -1,3 +1,4 @@
+import "./login.css";
 import { loginGestor } from "../lib/auth.js";
 import { soNumeroChave } from "../lib/chave.js";
 import { erroAmigavel } from "../lib/format.js";
@@ -7,11 +8,19 @@ export function renderLogin(app) {
   document.body.className = "is-painel";
   app.innerHTML = `
     <main class="login-page">
+      <aside class="login-brand" aria-label="FlowPDV Cardápio">
+        <div class="login-brand-content">
+          <img src="/logos/FlowPDV-vertical-escuro.png" alt="FlowPDV">
+          <h2>Seu cardápio, do seu jeito.</h2>
+          <p>Organize sua loja e deixe tudo pronto para seus clientes escolherem.</p>
+          <ul><li>Produtos, categorias e opções</li><li>Fotos e destaques do cardápio</li><li>Horários e configurações da loja</li></ul>
+        </div>
+      </aside>
+      <section class="login-form-panel" aria-labelledby="login-title">
       <form class="login-card" id="form-login">
-        <img src="/logos/FlowPDV-vertical-escuro.png" alt="FlowPDV">
-        <h1>Painel do <span>cardápio</span></h1>
+        <h1 id="login-title">Entrar no painel do cardápio</h1>
         <p class="sub">Entre com a chave da loja e a senha do gestor</p>
-        <div class="login-error" id="login-error"></div>
+        <div class="login-error" id="login-error" role="alert"></div>
         <div class="field">
           <label for="login-chave">Chave da licença</label>
           <div class="chave-row">
@@ -29,6 +38,7 @@ export function renderLogin(app) {
         <label class="remember"><input type="checkbox" id="login-lembrar" checked> Manter conectado</label>
         <button class="btn-primary" id="btn-entrar" type="submit">Entrar</button>
       </form>
+      </section>
     </main>
   `;
 
@@ -46,6 +56,7 @@ export function renderLogin(app) {
 
   app.querySelector("#btn-ver-pin").addEventListener("click", () => {
     pinEl.type = pinEl.type === "password" ? "text" : "password";
+    app.querySelector("#btn-ver-pin").setAttribute("aria-label", pinEl.type === "password" ? "Mostrar senha" : "Ocultar senha");
   });
 
   app.querySelector("#form-login").addEventListener("submit", async (ev) => {
