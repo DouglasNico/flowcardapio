@@ -17,7 +17,7 @@
   object-fit:cover;transform:scale(var(--foto-zoom,1));
   transform-origin:var(--foto-x,50%) var(--foto-y,50%);z-index:1;background:transparent;
 }
-.foto-produto.foto-produto[data-modo="inteira"] > .foto-frente {object-fit:contain;transform:none;}
+.foto-produto.foto-produto[data-modo="inteira"] > .foto-frente {object-fit:contain;}
 .is-menu .spot-media > .foto-produto {height:190px;}
 .is-menu .menu-media > .foto-produto {border-radius:10px;}
 @media (max-width:600px) {.is-menu .spot-media > .foto-produto {height:176px;}}

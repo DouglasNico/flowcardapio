@@ -11,7 +11,7 @@ export function normalizarEnquadramento(valor) {
   const modo = v.modo === "inteira" ? "inteira" : "preencher";
   return {
     modo,
-    zoom: modo === "inteira" ? 1 : limitar(v.zoom, 1, 3, 1),
+    zoom: limitar(v.zoom, 1, 3, 1),
     x: modo === "inteira" ? 50 : limitar(v.x, 0, 100, 50),
     y: modo === "inteira" ? 50 : limitar(v.y, 0, 100, 50)
   };
