@@ -430,11 +430,12 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const meta = [
       mesa ? `Mesa ${mesa}` : CANAL_LOJA,
       aberto ? "Aberto" : "Fechado",
-      publico.horarioTexto
-    ].filter(Boolean).join(" · ");
+      ...String(publico.horarioTexto || "").split("·")
+    ].map(texto => texto.trim()).filter(Boolean)
+      .map(texto => `<span class="store-detail">${esc(texto)}</span>`).join("");
     const prazo = aberto && publico.entregaTexto
-      ? ` · <span class="store-delivery">${ico.delivery}<span>Entrega: ${esc(publico.entregaTexto)}</span></span>` : "";
-    const minimo = aberto && mostraMin ? ` · ${esc(min)}` : "";
+      ? `<span class="store-detail"><span class="store-delivery">${ico.delivery}<span>Entrega: ${esc(publico.entregaTexto)}</span></span></span>` : "";
+    const minimo = aberto && mostraMin ? `<span class="store-detail">${esc(min)}</span>` : "";
     return `
       <header class="store-head">
         <div class="store-row">
@@ -443,7 +444,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
             : `<div class="store-logo ph-logo">${esc(iniciais(publico.nome))}</div>`}
           <div class="store-meta">
             <h1>${esc(publico.nome || "Cardápio")}</h1>
-            <p class="store-end"><span class="store-status ${aberto ? "on" : "off"}"></span><span>${esc(meta)}${prazo}${minimo}</span></p>
+            <p class="store-end"><span class="store-status ${aberto ? "on" : "off"}"></span><span class="store-details">${meta}${prazo}${minimo}</span></p>
           </div>
           <div class="store-tools">
             <button type="button" class="icon-btn" id="btn-busca" aria-label="Buscar">${ico.search}</button>

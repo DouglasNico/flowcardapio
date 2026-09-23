@@ -1,5 +1,6 @@
 
 # Publicacao frontend — 23/09/2026
+
 Usuario autorizou publicar todos os sites. Publicar reconstrucao do painel e cardapio existentes (rotas legadas) e fontes V2 protegidas por opt-in. Nao habilitar VITE_V2_HOSPEDADO, nao implantar Functions/regras/indices nem criar loja remota nesta rodada. /gestao-v2 segue informando ambiente nao habilitado ate preparar backend. Build de producao executado; testes completos ficam para amanha. Segredos, fixtures e arquivos locais functions/.env nao entram no commit.
 
 ## 23/09/2026 — SVG restantes
@@ -42,3 +43,6 @@ Validação: `npm run build` aprovado (aviso existente de chunk >500KB). Nenhuma
 - `src/lib/overlay.js` / `src/pages/cardapio.js`: publicação inclui `fotoEnquadramento` normalizado. Lista, carrossel, modal de produto e carrinho usam o mesmo renderizador; carrinho local preserva metadados. Não alterados preços, regras, backend V2 ou pedidos reais.
 - `src/pages/cardapio-design.css`: títulos das categorias com peso/tamanho discretamente maiores e divisor fino; itens com espaço interno, cantos suaves e conteúdo contido. Removido crescimento da foto no hover da lista; enquadramento permanece estável. `src/lib/icons.js` / `cardapio.js`: SVG próprio de motoboy junto de “Entrega: 40–70 min”, usando o prazo configurado, oculto quando não informado ou loja fechada.
 - Verificação: quatro testes Node em `tests/foto.test.js` passaram (compatibilidade, limites, foto inteira, preservação da origem/escape). Fixture offline com código real e CSS do build em1366x900,390x844,844x390: modos/prévias, arraste, salvar, falha/repetir, cancelar/Escape, upload simulado, scroll estável, modal de produto, hover sem crescimento e todos os conteúdos com margem interna; sem erro JavaScript/overflow. SVG/prazo conferidos em1366/390. Build aprovado (aviso anterior de chunk>500KB), detector do editor sem anti-patterns; avisos de tokens acompanham o visual existente. Evidências em `flowpdv-sistema/output/reconstrucao-web-20260923/cardapio-foto/`. Testes sem upload real ou escrita Firebase; a gravação/publicação de um catálogo real continua dependente da operação da loja.
+
+## 23/09/2026 — Espaçamento das informações abaixo do nome da loja
+`src/pages/cardapio.js` / `cardapio-design.css`: atendimento, status, dias, horário e entrega em grupos com12px de espaço, separadores discretos e quebra de linha com6px no celular; margem abaixo do título aumentada para9px. Mantidos textos e SVG de entrega. Verificação focal em desktop/mobile e build; nenhuma alteração de dados.

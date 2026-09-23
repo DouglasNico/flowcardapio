@@ -8,7 +8,10 @@ body.is-menu {--frame:1120px;--paper:#fffdf9;--line:#e6e1d9;--slate:#615e58;--mu
 .is-menu .store-row {grid-template-columns:64px minmax(0,1fr) auto;gap:18px;}
 .is-menu .store-logo {width:64px;height:64px;border-radius:12px;background:#263a2f;font-size:21px;}
 .is-menu .store-meta h1 {font-size:30px;letter-spacing:-1px;line-height:1.3;font-weight:750;white-space:normal;overflow:visible;}
-.is-menu .store-end {font-size:11px;line-height:1.7;color:#665f56;margin-top:7px;max-width:75ch;}
+.is-menu .store-end {font-size:11px;line-height:1.7;color:#665f56;margin-top:9px;max-width:none;}
+.is-menu .store-details {display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;}
+.is-menu .store-detail {display:inline-flex;align-items:center;gap:12px;}
+.is-menu .store-detail + .store-detail::before {content:"";width:2px;height:2px;flex-shrink:0;border-radius:50%;background:#9a9184;}
 .is-menu .store-status {margin-top:6px;}
 .is-menu .store-delivery {display:inline-flex;align-items:center;gap:5px;vertical-align:middle;white-space:nowrap;}
 .is-menu .store-delivery svg {width:17px;height:17px;flex-shrink:0;color:#7c562c;}
