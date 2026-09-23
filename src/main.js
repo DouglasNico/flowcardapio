@@ -56,12 +56,27 @@ async function render() {
     cleanup();
     cleanup = null;
   }
+  if (/^\/gestao-v2\/?$/.test(location.pathname)) {
+    const { renderGestaoV2 } = await import('./pages/gestao-v2.js');
+    cleanup = await renderGestaoV2(app) || null;
+    return;
+  }
+  if (/^\/v2\/[a-z0-9-]+\/garcom\/?$/.test(location.pathname)) {
+    const { renderGarcomV2 } = await import('./pages/garcom-v2.js');
+    cleanup = await renderGarcomV2(app) || null;
+    return;
+  }
+  if (location.pathname.startsWith('/v2/')) {
+    const { renderCardapioV2 } = await import('./pages/cardapio-v2.js');
+    cleanup = await renderCardapioV2(app) || null;
+    return;
+  }
   const rota = parseRota(location.pathname);
   document.body.className = "";
   document.title = rota.name === "painel" ? "Painel · FlowPDV Cardápio" : "Cardápio · FlowPDV";
 
   if (rota.name === "cardapio") {
-    await renderCardapio(app, rota);
+    cleanup = await renderCardapio(app, rota) || null;
     return;
   }
   if (rota.name === "pedido") {

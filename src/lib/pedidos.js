@@ -26,7 +26,9 @@ export function invalidarCardapioPublico() {
 export function escutarPedidosLoja(chave, onData, onError) {
   return onSnapshot(
     collection(db, "backups_lojas", chave, "pedidos"),
+    { includeMetadataChanges: true },
     (snap) => {
+      if (snap.metadata.hasPendingWrites) return;
       const lista = snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
       lista.sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
       onData(lista);

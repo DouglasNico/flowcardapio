@@ -1,3 +1,5 @@
+import { acompanharCategorias } from "../lib/categorias-scroll.js";
+import "./cardapio-design.css";
 import { criarPedido, lerCardapioPublico } from "../lib/pedidos.js";
 import { brl, erroAmigavel, esc, linkWhatsapp, toast } from "../lib/format.js";
 import { ico } from "../lib/icons.js";
@@ -72,7 +74,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   const produtos = todos.filter((p) => !p.esgotado);
   let itemAtual = itemId ? String(itemId) : null;
   let busca = "";
-  let buscaAberta = Boolean(busca);
+  let buscaAberta = true;
   let buscaExtra = "";
   let carrinho = lerCarrinho(chave, mesa);
   let sheetAberto = false;
@@ -81,6 +83,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   let fechandoItem = false;
   let grupoAberto = null;
   let catAtiva = "";
+  let limparCategorias = () => {};
   let pularScroll = false;
 
   function travarFundo(on) {
@@ -441,8 +444,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       return `
         <article class="spot-card" data-open="${esc(p.id)}" role="button" tabindex="0">
           <div class="spot-media">${foto}
-            <span class="spot-cap"><b>${esc(p.nome)}</b><small>${esc(rotuloPreco(p))}</small></span>
-          </div>
+            </div><span class="spot-cap"><b>${esc(p.nome)}</b><small>${esc(rotuloPreco(p))}</small></span>
         </article>`;
     }
     return `
@@ -475,7 +477,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const extraTopo = [
       buscaAberta || q ? `
         <div class="store-search">
-          <input type="search" id="menu-busca" placeholder="Buscar no cardápio" value="${esc(busca)}">
+          <input aria-label="Buscar no cardápio" type="search" id="menu-busca" placeholder="Buscar no cardápio" value="${esc(busca)}">
         </div>` : "",
       abas.length > 1 ? `
         <nav class="cats" aria-label="Categorias">
@@ -508,6 +510,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
                 </section>`;
             }).join("")}
           </div>
+          <footer class="menu-signature"><img src="/logos/FlowPDV-horizontal-claro.png" alt="FlowPDV"><span>Cardápio digital</span></footer>
           ${nItens() ? `
             <button type="button" class="cart-bar" id="btn-ver-pedido">
               <span class="cart-ico">${ico.bag}<em>${nItens()}</em></span>
@@ -655,8 +658,8 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
             <button type="button" class="icon-btn back-float" id="btn-voltar" aria-label="Voltar">${ico.back}</button>
             ${prod.fotoUrl ? `<img class="prod-hero" src="${esc(prod.fotoUrl)}" alt="">` : `<div class="prod-hero ph-hero">${ico.photo}</div>`}
             <div class="prod-body">
-              <p class="prod-cat">${esc(prod.categoria || "")}</p>
               <h1>${esc(prod.nome)}</h1>
+            <p class="prod-cat">${esc(prod.categoria || "")}</p>
               ${prod.descricao ? `<p class="prod-desc">${esc(prod.descricao)}</p>` : ""}
               <p class="prod-from">${mostraAPartirDe(prod) ? "A partir de " : ""}${brl(precoMinimo(prod))}</p>
               ${grupos.length ? grupos.map((g) => {
@@ -854,13 +857,9 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         pintar();
       });
     }
-    app.querySelectorAll("[data-cat]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        catAtiva = btn.dataset.cat;
-        app.querySelectorAll("[data-cat]").forEach((x) => x.classList.toggle("on", x === btn));
-        const alvo = document.getElementById(catAtiva);
-        if (alvo) alvo.scrollIntoView({ behavior: reduzMovimento() ? "auto" : "smooth", block: "start" });
-      });
+    limparCategorias();
+    limparCategorias = acompanharCategorias(app, {
+      aoAtivar: id => { catAtiva = id; }, movimentoReduzido: reduzMovimento
     });
     app.querySelectorAll("[data-open]").forEach((el) => {
       const go = () => abrirItem(el.dataset.open);
@@ -933,4 +932,5 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   }
 
   pintar();
+  return () => { limparCategorias(); overlayEl()?.remove(); travarFundo(false); };
 }
