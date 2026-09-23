@@ -76,14 +76,14 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   const produtos = todos.filter((p) => !p.esgotado);
   let itemAtual = itemId ? String(itemId) : null;
   let busca = "";
-  let buscaAberta = true;
+  let buscaAberta = false;
   let focarBusca = false;
   let scrollBusca = window.scrollY;
   let pausaBusca = 0;
 
   function atualizarBusca() {
     const area = app.querySelector('.store-search');
-    const aberta = buscaAberta || Boolean(busca.trim());
+    const aberta = buscaAberta;
     area?.classList.toggle('is-collapsed', !aberta);
     if (area) area.inert = !aberta;
     app.querySelector('#btn-busca')?.setAttribute('aria-expanded', String(aberta));
@@ -91,12 +91,13 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
 
   function acompanharBusca() {
     const y = window.scrollY, delta = y - scrollBusca;
-    if (itemAtual || sheetAberto || busca.trim() || document.activeElement?.id === 'menu-busca' || performance.now() < pausaBusca) { scrollBusca = y; return; }
-    if (Math.abs(delta) <= 8 && y >= 80) return;
+    if (itemAtual || sheetAberto || performance.now() < pausaBusca) { scrollBusca = y; return; }
+    if (Math.abs(delta) <= 8) return;
     scrollBusca = y;
-    const aberta = y < 80 || delta < -8 ? true : y > 180 && delta > 8 ? false : buscaAberta;
+    const aberta = y > 80 && delta > 8 ? false : buscaAberta;
     if (aberta !== buscaAberta) {
       buscaAberta = aberta;
+      if (!aberta && document.activeElement?.id === 'menu-busca') document.activeElement.blur();
       pausaBusca = performance.now() + 280;
       atualizarBusca();
     }
@@ -112,6 +113,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   let grupoAberto = null;
   let catAtiva = "";
   let limparCategorias = () => {};
+  let limparCarrossel = () => {};
   let pularScroll = false;
 
   function travarFundo(on) {
@@ -516,7 +518,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       ...cats.map((c) => [c, idCategoria(c)])
     ];
     const extraTopo = [
-      `<div class="store-search${buscaAberta || q ? '' : ' is-collapsed'}" id="store-search" ${buscaAberta || q ? '' : 'inert'}>
+      `<div class="store-search${buscaAberta ? '' : ' is-collapsed'}" id="store-search" ${buscaAberta ? '' : 'inert'}>
           <div class="store-search-inner"><input aria-label="Buscar no cardápio" type="search" id="menu-busca" placeholder="Buscar no cardápio" value="${esc(busca)}"></div>
         </div>`,
       abas.length > 1 ? `
@@ -534,8 +536,8 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
           ${topoLoja(extraTopo)}
           ${destaques.length ? `
             <section class="spot-wrap" id="${idMais}">
-              <h2>Mais pedidos</h2>
-              <div class="spot-row">${destaques.map((p) => cardProduto(p, true, todosDestaque)).join("")}</div>
+              <div class="spot-heading"><div><h2 id="spot-title">Mais pedidos</h2><p>Explore os destaques da loja.</p></div><div class="spot-controls"><span id="spot-position" aria-live="polite"></span><button type="button" class="icon-btn" data-spot-prev aria-label="Destaques anteriores" aria-controls="spot-carousel">${ico.back}</button><button type="button" class="icon-btn" data-spot-next aria-label="Próximos destaques" aria-controls="spot-carousel">${ico.back}</button></div></div>
+              <div class="spot-row" id="spot-carousel" role="region" aria-roledescription="carrossel" aria-labelledby="spot-title" tabindex="0">${destaques.map((p) => cardProduto(p, true, todosDestaque)).join("")}</div>
             </section>` : ""}
           <div class="menu-list">
             ${q ? `
@@ -881,10 +883,41 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     });
   }
 
+  function ligarCarrossel() {
+    limparCarrossel();
+    const row = app.querySelector('.spot-row');
+    if (!row) return;
+    const prev = app.querySelector('[data-spot-prev]'), next = app.querySelector('[data-spot-next]');
+    const cards = [...row.querySelectorAll('.spot-card')];
+    const medidas = () => {
+      const css = getComputedStyle(row), gap = parseFloat(css.columnGap) || 0;
+      const passo = cards[0].getBoundingClientRect().width + gap;
+      const largura = row.clientWidth - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight);
+      return {passo, visiveis:Math.max(1,Math.floor((largura + gap + 1) / passo))};
+    };
+    const atualizar = () => {
+      const {passo,visiveis} = medidas();
+      const inicio = Math.min(cards.length, Math.round(row.scrollLeft / passo) + 1);
+      prev.disabled = row.scrollLeft <= 2;
+      next.disabled = row.scrollLeft + row.clientWidth >= row.scrollWidth - 2;
+      app.querySelector('#spot-position').textContent = `${inicio}–${Math.min(cards.length,inicio+visiveis-1)} de ${cards.length}`;
+    };
+    const mover = direcao => {const {passo,visiveis}=medidas();row.scrollBy({left:direcao*passo*visiveis,behavior:reduzMovimento()?'instant':'smooth'});};
+    prev.onclick = () => mover(-1);
+    next.onclick = () => mover(1);
+    const teclado = ev => {if (ev.target !== row || !['ArrowLeft','ArrowRight'].includes(ev.key)) return;ev.preventDefault();mover(ev.key==='ArrowLeft'?-1:1);};
+    row.addEventListener('scroll',atualizar,{passive:true});
+    row.addEventListener('keydown',teclado);
+    const observer = new ResizeObserver(atualizar); observer.observe(row);
+    atualizar();
+    limparCarrossel = () => {observer.disconnect();row.removeEventListener('scroll',atualizar);row.removeEventListener('keydown',teclado);};
+  }
+
   function bindLista() {
+    ligarCarrossel();
     const buscaEl = app.querySelector("#menu-busca");
     if (buscaEl) {
-      buscaEl.addEventListener("input", () => { busca = buscaEl.value; focarBusca = true; pintar(); });
+      buscaEl.addEventListener("input", () => { busca = buscaEl.value; buscaAberta = true; focarBusca = true; pintar(); });
       if (focarBusca && !sheetAberto) {
         focarBusca = false;
         const pos = buscaEl.value.length;
@@ -895,10 +928,13 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const btnBusca = app.querySelector("#btn-busca");
     if (btnBusca) {
       btnBusca.addEventListener("click", () => {
-        buscaAberta = !buscaAberta || Boolean(busca.trim());
+        buscaAberta = !buscaAberta;
         pausaBusca = performance.now() + 280;
         atualizarBusca();
-        if (buscaAberta) buscaEl?.focus({preventScroll:true});
+        if (buscaAberta) setTimeout(() => {
+          if (buscaAberta && buscaEl?.isConnected && !itemAtual && !sheetAberto) buscaEl.focus({preventScroll:true});
+        }, reduzMovimento() ? 0 : 260);
+        else if (document.activeElement === buscaEl) buscaEl.blur();
       });
     }
     btnBusca?.setAttribute('aria-controls', 'store-search');
@@ -988,5 +1024,5 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
 
   pintar();
   window.addEventListener('scroll', acompanharBusca, {passive:true});
-  return () => { window.removeEventListener('scroll', acompanharBusca); limparCategorias(); overlayEl()?.remove(); travarFundo(false); };
+  return () => { window.removeEventListener('scroll', acompanharBusca); limparCarrossel(); limparCategorias(); overlayEl()?.remove(); travarFundo(false); };
 }

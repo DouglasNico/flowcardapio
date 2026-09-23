@@ -97,3 +97,47 @@ body.is-menu {--frame:1120px;--paper:#fffdf9;--line:#e6e1d9;--slate:#615e58;--mu
  .is-menu .sheet-foot .btn-ghost {margin:0;}
  .is-menu .sheet-foot button {min-height:40px;padding:8px;font-size:12px;}
 }
+
+/* Busca: foco interno não é recortado pela área que recolhe. */
+.is-menu .store-search input:focus {outline:2px solid #ad3d11;outline-offset:-2px;box-shadow:none;}
+.is-menu img.store-logo {background:transparent;border:0;border-radius:0;box-shadow:none;object-fit:contain;}
+/* Destaques com região própria e navegação explícita, sem avanço automático. */
+.is-menu .spot-wrap {background:#f5f0e7;margin:24px 0 20px;padding:24px 0;border-block:1px solid #e6ded1;}
+.is-menu .spot-heading {display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 var(--pad) 20px;}
+.is-menu .spot-heading h2 {padding:0;margin:0;}
+.is-menu .spot-heading p {margin:6px 0 0;font-size:12px;color:#665d50;}
+.is-menu .spot-controls {display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.is-menu .spot-controls span {font-size:12px;color:#665d50;margin-right:4px;font-variant-numeric:tabular-nums;}
+.is-menu .spot-controls .icon-btn {width:44px;height:44px;border:1px solid #cfc5b7;}
+.is-menu .spot-controls .icon-btn:hover:not(:disabled) {background:#e9dfd0;color:#91360f;}
+.is-menu .spot-controls .icon-btn:disabled {opacity:.35;cursor:default;}
+.is-menu [data-spot-next] svg {transform:rotate(180deg);}
+.is-menu .spot-row {gap:20px;padding-bottom:4px;overscroll-behavior-x:contain;}
+.is-menu .spot-card {flex:0 0 calc((100% - 40px)/3);max-width:none;border-radius:12px;}
+.is-menu .spot-media {overflow:hidden;border-radius:12px;}
+.is-menu .spot-media img,.is-menu .spot-media .ph {display:block;width:100%;height:190px;transition:transform .2s ease-out;}
+.is-menu .spot-media .ph {display:grid;}
+.is-menu .spot-cap {padding:14px 0 4px;}
+.is-menu .spot-card:focus-visible {outline-offset:-3px;}
+@media(hover:hover) {
+ .is-menu .spot-card:hover .spot-media img {transform:scale(1.035);}
+ .is-menu .spot-card:hover .spot-cap b {color:#ad3d11;text-decoration:underline;text-underline-offset:4px;}
+ .is-menu .menu-item:hover {background:#f6f0e6;}
+}
+@media(max-width:900px) {.is-menu .spot-card {flex-basis:calc((100% - 20px)/2);}}
+@media(max-width:600px) {
+ .is-menu .spot-wrap {margin-top:16px;padding:20px 0;}
+ .is-menu .spot-heading {align-items:flex-start;gap:10px;}
+ .is-menu .spot-heading h2 {font-size:20px;}
+ .is-menu .spot-heading p {max-width:18ch;}
+ .is-menu .spot-controls {gap:6px;flex-wrap:wrap;justify-content:flex-end;width:94px;}
+ .is-menu .spot-controls span {width:100%;text-align:right;margin-right:0;}
+ .is-menu .spot-card {flex-basis:82%;}
+ .is-menu .spot-media img,.is-menu .spot-media .ph {height:176px;}
+}
+/* O término da animação usa exatamente o mesmo tom do fundo estático. */
+.is-menu .sheet,.is-menu .prod-overlay {--menu-dim:rgba(23,43,36,.35);background:var(--menu-dim);}
+.is-menu .sheet.is-in,.is-menu .prod-overlay.is-in {animation-name:menuDimIn;}
+.is-menu .prod-overlay.is-out {animation-name:menuDimOut;}
+@keyframes menuDimIn {from {background:rgba(23,43,36,0);} to {background:var(--menu-dim);}}
+@keyframes menuDimOut {from {background:var(--menu-dim);} to {background:rgba(23,43,36,0);}}
