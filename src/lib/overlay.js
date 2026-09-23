@@ -1,4 +1,5 @@
 import { entregaPublica } from "../../shared/entrega.js";
+import { normalizarEnquadramento } from "./foto.js";
 import {
   collection,
   doc,
@@ -103,6 +104,7 @@ export async function publicarCardapio(chave) {
       categoria: String(p.categoria || "Geral"),
       descricao: String(ov.descricao || "").slice(0, 400),
       fotoUrl: String(ov.fotoUrl || ""),
+      fotoEnquadramento: normalizarEnquadramento(ov.fotoEnquadramento),
       esgotado: Boolean(ov.esgotado),
       destaque: Boolean(ov.destaque),
       grupos: sanitizarGrupos(ov.grupos),

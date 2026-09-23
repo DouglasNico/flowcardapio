@@ -15,3 +15,4 @@ ico.close = line('<path d="m6 6 12 12M18 6 6 18"/>');
 ico.food = line('<path d="M4 3v6c0 3 6 3 6 0V3M7 3v18M20 21V3c-5 0-5 10 0 10"/>');
 ico.drink = line('<path d="M6 3h12v5a6 6 0 0 1-12 0V3ZM12 14v7M8 21h8"/>');
 ico.burger = line('<path d="M3 10a9 7 0 0 1 18 0H3ZM2 14h20M3 18h18l-2 3H5l-2-3Z"/>');
+ico.delivery = line('<circle cx="5" cy="18" r="3"/><circle cx="19" cy="18" r="3"/><circle cx="12" cy="4" r="2"/><path d="m10 8-2 4 5 2v4M10 8l4 3h3M5 18l4-5h6l-3 5H5M16 8h2l1 10"/><rect x="1" y="8" width="5" height="4" rx="1"/>');

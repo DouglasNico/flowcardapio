@@ -2,6 +2,8 @@ import {compararCategorias} from "../lib/categorias.js";
 import {telefoneFormatado, calcularEntrega} from "../../shared/entrega.js";
 import { acompanharCategorias } from "../lib/categorias-scroll.js";
 import "./cardapio-design.css";
+import "../lib/foto.css";
+import { htmlFoto, normalizarEnquadramento } from "../lib/foto.js";
 import { criarPedido, lerCardapioPublico } from "../lib/pedidos.js";
 import { brl, erroAmigavel, esc, linkWhatsapp, toast } from "../lib/format.js";
 import { ico } from "../lib/icons.js";
@@ -38,7 +40,8 @@ function lerCarrinho(chave, mesa) {
       quantidade: Math.max(1, Number(i.quantidade) || 1),
       observacao: i.observacao || "",
       extras: Array.isArray(i.extras) ? i.extras : [],
-      fotoUrl: i.fotoUrl || ""
+      fotoUrl: i.fotoUrl || "",
+      fotoEnquadramento: normalizarEnquadramento(i.fotoEnquadramento)
     }));
   } catch {
     return [];
@@ -347,7 +350,8 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       quantidade: Math.max(1, rascunho.qtd),
       observacao: String(rascunho.obs || "").slice(0, 180),
       extras: rascunho.extras,
-      fotoUrl: prod.fotoUrl || ""
+      fotoUrl: prod.fotoUrl || "",
+      fotoEnquadramento: normalizarEnquadramento(prod.fotoEnquadramento)
     });
     salvarCarrinho(chave, mesa, carrinho);
     toast("Adicionado ao pedido");
@@ -426,10 +430,11 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const meta = [
       mesa ? `Mesa ${mesa}` : CANAL_LOJA,
       aberto ? "Aberto" : "Fechado",
-      publico.horarioTexto,
-      aberto && publico.entregaTexto,
-      aberto && mostraMin ? min : ""
+      publico.horarioTexto
     ].filter(Boolean).join(" · ");
+    const prazo = aberto && publico.entregaTexto
+      ? ` · <span class="store-delivery">${ico.delivery}<span>Entrega: ${esc(publico.entregaTexto)}</span></span>` : "";
+    const minimo = aberto && mostraMin ? ` · ${esc(min)}` : "";
     return `
       <header class="store-head">
         <div class="store-row">
@@ -438,7 +443,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
             : `<div class="store-logo ph-logo">${esc(iniciais(publico.nome))}</div>`}
           <div class="store-meta">
             <h1>${esc(publico.nome || "Cardápio")}</h1>
-            <p class="store-end"><span class="store-status ${aberto ? "on" : "off"}"></span><span>${esc(meta)}</span></p>
+            <p class="store-end"><span class="store-status ${aberto ? "on" : "off"}"></span><span>${esc(meta)}${prazo}${minimo}</span></p>
           </div>
           <div class="store-tools">
             <button type="button" class="icon-btn" id="btn-busca" aria-label="Buscar">${ico.search}</button>
@@ -481,7 +486,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
 
   function cardProduto(p, destaque, todosDestaque) {
     const foto = p.fotoUrl
-      ? `<img src="${esc(p.fotoUrl)}" alt="">`
+      ? htmlFoto(p)
       : `<div class="ph">${ico.photo}</div>`;
     if (destaque) {
       return `
@@ -588,7 +593,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     return `
       <article class="cart-item" data-linha="${esc(i.linhaId)}">
         ${foto
-          ? `<img class="cart-thumb" src="${esc(foto)}" alt="">`
+          ? `<div class="cart-thumb">${htmlFoto({ fotoUrl: foto, fotoEnquadramento: p?.fotoUrl ? p.fotoEnquadramento : i.fotoEnquadramento })}</div>`
           : `<div class="cart-thumb ph">${ico.photo}</div>`}
         <div class="cart-copy">
           <div class="cart-item-top">
@@ -700,7 +705,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     overlay.innerHTML = `
           <div class="prod-page">
             <button type="button" class="icon-btn back-float" id="btn-voltar" aria-label="Voltar">${ico.back}</button>
-            ${prod.fotoUrl ? `<img class="prod-hero" src="${esc(prod.fotoUrl)}" alt="">` : `<div class="prod-hero ph-hero">${ico.photo}</div>`}
+            ${prod.fotoUrl ? `<div class="prod-hero">${htmlFoto(prod)}</div>` : `<div class="prod-hero ph-hero">${ico.photo}</div>`}
             <div class="prod-body">
               <h1>${esc(prod.nome)}</h1>
             <p class="prod-cat">${esc(prod.categoria || "")}</p>

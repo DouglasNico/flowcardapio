@@ -4,6 +4,9 @@ import {ligarBuscaCep} from "../lib/cep.js";
 import {telefoneFormatado, telefoneDigitos, enderecoEstruturado, enderecoTexto, validarEntrega} from "../../shared/entrega.js";
 import QRCode from "qrcode";
 import "./painel-catalogo.css";
+import "../lib/foto.css";
+import { htmlFoto, normalizarEnquadramento } from "../lib/foto.js";
+import { abrirEditorFoto } from "./painel-foto.js";
 import { ico } from "../lib/icons.js";
 import { nomeDaLoja, sairDaLoja } from "../lib/auth.js";
 import { carregarBackupLoja, precoProduto, produtoAtivo } from "../lib/backup.js";
@@ -206,10 +209,36 @@ export async function renderPainel(app, sessao) {
     }
   }
 
+  function ajustarFoto(id) {
+    if (publicando || salvando.has(id) || !overlays[id]?.fotoUrl) return;
+    const produto = produtos.find(p => String(p.id) === String(id));
+    abrirEditorFoto({
+      nome: produto?.nome || "Produto",
+      fotoUrl: overlays[id].fotoUrl,
+      enquadramento: overlays[id].fotoEnquadramento,
+      onSave: async fotoEnquadramento => {
+        if (publicando || salvando.has(id)) throw new Error("Aguarde a alteração em andamento e tente novamente.");
+        salvando.add(id); atualizarResumo();
+        try {
+          await salvarOverlay(chave, id, { fotoEnquadramento });
+          overlays[id] = { ...overlays[id], fotoEnquadramento };
+          toast("Enquadramento salvo. Publique o cardápio para atualizar os clientes.");
+        } finally {
+          salvando.delete(id); pintarLista(); atualizarResumo();
+        }
+      },
+      onClose: () => [...main.querySelectorAll(".prod-card")].find(r => r.dataset.id === String(id))
+        ?.querySelector("[data-ajustar-foto]")?.focus({ preventScroll: true })
+    });
+  }
+
   async function onFoto(id, file) {
-    if (!file) return;
+    if (!file || publicando || salvando.has(id)) return;
+    salvando.add(id); atualizarResumo();
     const wrap = main.querySelector(`.prod-card[data-id="${id}"] .thumb-wrap`);
     if (wrap) wrap.classList.add("is-load");
+    wrap?.closest(".prod-card")?.querySelectorAll("button,input,textarea").forEach(el => el.disabled = true);
+    let enviada = false;
     try {
       const oldId = overlays[id] && overlays[id].fotoPublicId;
       const assinatura = await assinarUpload(chave, id);
@@ -217,19 +246,24 @@ export async function renderPainel(app, sessao) {
       if (oldId && oldId !== up.public_id) {
         try { await removerFoto(chave, id, oldId); } catch { /* troca segue */ }
       }
-      overlays[id] = {
+      const novoOverlay = {
         ...(overlays[id] || {}),
         visivel: overlays[id] ? overlays[id].visivel !== false : true,
         fotoUrl: up.secure_url,
-        fotoPublicId: up.public_id
+        fotoPublicId: up.public_id,
+        fotoEnquadramento: normalizarEnquadramento({ modo: "inteira" })
       };
-      await salvarOverlay(chave, id, overlays[id]);
+      await salvarOverlay(chave, id, novoOverlay);
+      overlays[id] = novoOverlay;
+      enviada = true;
       toast("Foto enviada.");
-      pintarLista();
     } catch (err) {
       if (wrap) wrap.classList.remove("is-load");
       toast(erroAmigavel(err));
+    } finally {
+      salvando.delete(id); pintarLista(); atualizarResumo();
     }
+    if (enviada) ajustarFoto(id);
   }
 
   async function onRemoverFoto(id) {
@@ -536,13 +570,13 @@ export async function renderPainel(app, sessao) {
     lista.innerHTML = rows.map((p) => {
       const ov = overlays[p.id] || overlays[String(p.id)] || {};
       const nOp = sanitizarGrupos(ov.grupos).length;
-      const foto = ov.fotoUrl ? `<img class="thumb" src="${esc(ov.fotoUrl)}" alt="">` : `<div class="thumb">${esc((p.nome || "?").slice(0, 1))}</div>`;
+      const foto = ov.fotoUrl ? htmlFoto(ov) : `<div class="thumb">${esc((p.nome || "?").slice(0, 1))}</div>`;
       return `
         <article class="prod-card ${ov.visivel ? "on" : ""}" data-id="${esc(p.id)}">
           <div class="produto-midia"><div class="thumb-wrap">
             ${foto}
             <span class="thumb-load">Enviando foto...</span>
-          </div><div class="produto-foto-acoes"><button type="button" class="btn-ghost" data-add-foto>${ico.photo}${ov.fotoUrl ? "Trocar foto" : "Adicionar foto"}</button><input data-foto-input type="file" accept="image/jpeg,image/png,image/webp" hidden>${ov.fotoUrl || ov.fotoPublicId ? `<button type="button" class="btn-ghost foto-remover" data-del-foto>Remover foto</button>` : ""}</div></div>
+          </div><div class="produto-foto-acoes"><button type="button" class="btn-ghost" data-add-foto>${ico.photo}${ov.fotoUrl ? "Trocar foto" : "Adicionar foto"}</button><input data-foto-input type="file" accept="image/jpeg,image/png,image/webp" hidden>${ov.fotoUrl ? `<button type="button" class="btn-ghost" data-ajustar-foto>Ajustar foto</button>` : ""}${ov.fotoUrl || ov.fotoPublicId ? `<button type="button" class="btn-ghost foto-remover" data-del-foto>Remover foto</button>` : ""}</div></div>
           <div class="prod-card-body">
             <div class="prod-card-top">
               <h3>${esc(p.nome || "Sem nome")}</h3>
@@ -578,6 +612,7 @@ export async function renderPainel(app, sessao) {
       row.querySelector("[data-destaque]").addEventListener("change", (ev) => patchOverlay(id, { destaque: ev.target.checked }, "[data-destaque]"));
       row.querySelector("[data-esgotado]").addEventListener("change", (ev) => patchOverlay(id, { esgotado: ev.target.checked }, "[data-esgotado]"));
       row.querySelector("[data-add-foto]").addEventListener("click",()=>row.querySelector("[data-foto-input]").click());
+      row.querySelector("[data-ajustar-foto]")?.addEventListener("click", () => ajustarFoto(id));
       row.querySelectorAll('input[type="file"]').forEach((inp) => {
         inp.addEventListener("change", (ev) => {
           const file = ev.target.files && ev.target.files[0];
