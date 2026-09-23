@@ -118,6 +118,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   let limparCategorias = () => {};
   let limparCarrossel = () => {};
   let pularScroll = false;
+  let retornoItem = null;
 
   function travarFundo(on) {
     const html = document.documentElement;
@@ -249,7 +250,8 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     return carrinho.reduce((s, i) => s + i.quantidade, 0);
   }
 
-  function abrirItem(id) {
+  function abrirItem(id, origem = null, teclado = false) {
+    retornoItem = origem ? { teclado, tipo: origem.classList.contains("spot-card") ? ".spot-card" : ".menu-item" } : null;
     itemAtual = String(id);
     rascunho = novoRascunho();
     buscaExtra = "";
@@ -265,6 +267,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   function fecharItem() {
     if (fechandoItem) return;
     const idFechado = String(itemAtual);
+    const retorno = retornoItem;
     const overlay = overlayEl();
     const url = pathLista();
     let done = false;
@@ -278,7 +281,11 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       travarFundo(false);
       if (overlay && overlay.parentNode) overlay.remove();
       pintarLista();
-      [...app.querySelectorAll("[data-open]")].find(el => el.dataset.open === idFechado)?.focus({ preventScroll: true });
+      // Restore keyboard navigation to the same occurrence, without marking mouse-opened cards.
+      if (retorno?.teclado) {
+        [...app.querySelectorAll(retorno.tipo)].find(el => el.dataset.open === idFechado)?.focus({ preventScroll: true });
+      }
+      retornoItem = null;
     };
     if (overlay && !reduzMovimento()) {
       fechandoItem = true;
@@ -952,10 +959,10 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       aoAtivar: id => { catAtiva = id; }, movimentoReduzido: reduzMovimento
     });
     app.querySelectorAll("[data-open]").forEach((el) => {
-      const go = () => abrirItem(el.dataset.open);
-      el.addEventListener("click", go);
+      const go = (teclado = false) => abrirItem(el.dataset.open, el, teclado);
+      el.addEventListener("click", ev => go(ev.detail === 0));
       el.addEventListener("keydown", (ev) => {
-        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); go(); }
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); go(true); }
       });
     });
     const ver = app.querySelector("#btn-ver-pedido");
