@@ -1,3 +1,4 @@
+import {compararCategorias} from "../lib/categorias.js";
 import {telefoneFormatado, calcularEntrega} from "../../shared/entrega.js";
 import { acompanharCategorias } from "../lib/categorias-scroll.js";
 import "./cardapio-design.css";
@@ -508,7 +509,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const destaquesAll = produtos.filter((p) => p.destaque);
     const todosDestaque = produtos.length > 0 && destaquesAll.length >= produtos.length;
     const destaques = (!q && !todosDestaque) ? destaquesAll.slice(0, 8) : [];
-    const cats = q ? [] : [...new Set(lista.map((p) => p.categoria || "Geral"))];
+    const cats = q ? [] : [...new Set(lista.map((p) => p.categoria || "Geral"))].sort(compararCategorias);
     const idMais = "cat-mais-pedidos";
     const abas = [
       ...(destaques.length ? [["Mais pedidos", idMais]] : []),

@@ -1,3 +1,5 @@
+import {compararCategorias} from "../lib/categorias.js";
+import {ligarBuscaCep} from "../lib/cep.js";
 import {telefoneFormatado, telefoneDigitos, enderecoEstruturado, enderecoTexto, validarEntrega} from "../../shared/entrega.js";
 import QRCode from "qrcode";
 import "./painel-catalogo.css";
@@ -84,7 +86,8 @@ export async function renderPainel(app, sessao) {
   let overlays = {};
   let config = {};
   let filtro = "";
-  let categoria = "", categoriaInicializada = false, situacao = "", carregado = false, publicando = false;
+  let limparCep = () => {};
+  let categoria = "", situacao = "", carregado = false, publicando = false;
   const rascunhos = new Map(), salvando = new Set(), estados = new Map(), editoresAbertos = new Set();
   let unsubPedidos = null;
   let pedidos = [];
@@ -243,6 +246,7 @@ export async function renderPainel(app, sessao) {
   }
 
   function pintarLoja() {
+    limparCep();
     const cfg = lojaDraft || config;
     const form = lerFormatoLoja(cfg);
     const endereco = enderecoEstruturado(cfg.enderecoDetalhado);
@@ -279,6 +283,7 @@ export async function renderPainel(app, sessao) {
             Pausar pedidos
           </label>
         </div>
+        <div class="loja-coluna">
         <div class="card">
           <h3>Funcionamento</h3>
           <p class="loja-help">Escolha um atalho ou monte os dias e o horário.</p>
@@ -304,11 +309,14 @@ export async function renderPainel(app, sessao) {
           </label>
           <p class="loja-preview-line" id="lj-min-preview">${esc(textoMinimo(form.pedidoMinimoValor))}</p>
         </div>
+        </div><div class="loja-coluna">
         <div class="card">
           <h3>WhatsApp e endereço da loja</h3>
           <div class="loja-grid loja-endereco">
-            <label class="span-full">WhatsApp (DDD + número)<input id="lj-wa" type="tel" autocomplete="tel-national" maxlength="16" placeholder="(DDD) número" value="${esc(telefoneFormatado(cfg.whatsapp))}"></label>
-            ${Object.entries({rua:'Rua / avenida',numero:'Número',complemento:'Complemento',bairro:'Bairro',cidade:'Cidade',uf:'UF',cep:'CEP'}).map(([k,label])=>`<label>${label}<input data-endereco="${k}" maxlength="${k==='uf'?2:k==='cep'?9:100}" value="${esc(endereco[k])}" placeholder="${k==='complemento'?'Opcional':label}" ${k==='cep'?'inputmode="numeric"':''}></label>`).join('')}
+            <label>WhatsApp (DDD + número)<input id="lj-wa" type="tel" autocomplete="tel-national" maxlength="16" placeholder="(DDD) número" value="${esc(telefoneFormatado(cfg.whatsapp))}"></label>
+            <label>CEP<input data-endereco="cep" inputmode="numeric" autocomplete="postal-code" maxlength="9" placeholder="00000-000" value="${esc(endereco.cep)}" aria-describedby="lj-cep-status"></label>
+            <p id="lj-cep-status" class="loja-help span-full" role="status">Digite o CEP para preencher o endereço automaticamente.</p>
+            ${Object.entries({rua:'Rua / avenida',numero:'Número',complemento:'Complemento',bairro:'Bairro',cidade:'Cidade',uf:'UF'}).map(([k,label])=>`<label>${label}<input data-endereco="${k}" maxlength="${k==='uf'?2:k==='cep'?9:100}" value="${esc(endereco[k])}" placeholder="${k==='complemento'?'Opcional':label}" ${k==='cep'?'inputmode="numeric"':''}></label>`).join('')}
           </div>
           ${cfg.endereco&&!endereco.rua?`<p class="loja-help">Endereço anterior: ${esc(cfg.endereco)}. Será mantido até você preencher os campos separados.</p>`:''}
         </div>
@@ -319,6 +327,7 @@ export async function renderPainel(app, sessao) {
           <div id="delivery-bairros">${(entrega.bairros||[]).map(b=>`<div class="delivery-bairro" data-bairro-id="${esc(b.id)}"><label>Bairro<input data-bairro-nome value="${esc(b.nome)}" maxlength="80"></label><label>Taxa do cliente (R$)<input data-bairro-taxa type="number" min="0" max="10000" step="0.01" value="${(b.taxaCentavos||0)/100}"></label><label>Repasse motoboy (R$)<input data-bairro-repasse type="number" min="0" max="10000" step="0.01" value="${(b.repasseCentavos||0)/100}"></label><button type="button" class="btn-ghost" data-bairro-remover aria-label="Remover bairro">${ico.close}</button></div>`).join('')}</div>
           <button type="button" class="btn-ghost" id="lj-add-bairro">Adicionar bairro</button>
           <p class="loja-help">Taxa zero significa entrega grátis. Bairros não cadastrados não podem finalizar entrega. Pedidos de mesa e retirada não recebem essa taxa.</p>
+        </div>
         </div>
       </div>
     `;
@@ -368,6 +377,7 @@ export async function renderPainel(app, sessao) {
     main.querySelector("#pausado").addEventListener("change", salvarHorario);
     main.querySelector('#lj-wa').addEventListener('input',e=>{e.target.value=telefoneFormatado(e.target.value);});
     main.querySelectorAll('#lj-wa, [data-endereco], #lj-abre, #lj-fecha, #lj-min-val, #lj-delivery, [data-bairro-id] input').forEach(el=>el.addEventListener('input',salvarHorario));
+    limparCep = ligarBuscaCep({input:main.querySelector('[data-endereco="cep"]'),campos:Object.fromEntries(['rua','bairro','cidade','uf'].map(k=>[k,main.querySelector(`[data-endereco="${k}"]`)])),status:main.querySelector('#lj-cep-status'),aoPreencher:salvarHorario});
     main.querySelector('#lj-add-bairro').onclick=()=>{salvarHorario();lojaDraft.delivery.bairros.push({id:crypto.randomUUID(),nome:'',taxaCentavos:0,repasseCentavos:0});pintarLoja();main.querySelector('[data-bairro-id]:last-child input').focus();};
     main.querySelectorAll('[data-bairro-remover]').forEach(btn=>btn.onclick=()=>{const id=btn.closest('[data-bairro-id]').dataset.bairroId;salvarHorario();lojaDraft.delivery.bairros=lojaDraft.delivery.bairros.filter(b=>b.id!==id);pintarLoja();});
     main.querySelectorAll(".pick").forEach(b=>b.setAttribute("aria-pressed", String(b.classList.contains("on"))));
@@ -429,6 +439,7 @@ export async function renderPainel(app, sessao) {
         saved.textContent = "Escolha pelo menos um dia, preencha os horários e informe um mínimo válido.";
         saved.dataset.error = "true"; return;
       }
+      if (main.querySelector('[data-endereco="cep"]').getAttribute('aria-busy') === 'true') { saved.textContent = 'Aguarde a consulta do CEP antes de salvar.'; return; }
       const patch = {...patchLoja(st), pausado:main.querySelector("#pausado").checked, ...contatoEntrega()};
       try {
         if (patch.whatsapp && ![10,11].includes(patch.whatsapp.length)) throw new Error('Informe um WhatsApp com DDD válido.');
@@ -458,8 +469,7 @@ export async function renderPainel(app, sessao) {
 
   function pintarCardapio() {
     const visiveis = produtos.filter((p) => overlays[p.id] && overlays[p.id].visivel).length;
-    const categorias = [...new Set(produtos.map(p=>p.categoria||"Geral"))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
-    if (!categoriaInicializada && categorias.length) { categoria = categorias[0]; categoriaInicializada = true; }
+    const categorias = [...new Set(produtos.map(p=>p.categoria||"Geral"))].sort(compararCategorias);
     main.innerHTML = `
       <section class="page-head catalogo-head">
         <div>
@@ -467,13 +477,13 @@ export async function renderPainel(app, sessao) {
           <p>Organize os produtos que seus clientes vão encontrar.</p>
           <p id="catalogo-resumo"></p>
         </div>
-        <button class="btn-primary fit" id="btn-publicar" type="button">Publicar cardápio (${visiveis})</button>
       </section>
       <nav class="catalogo-categorias" aria-label="Categorias do cardápio">${["",...categorias].map(c=>`<button type="button" data-categoria="${esc(c)}" aria-pressed="${categoria===c}">${esc(c||"Todos")}<span>${produtos.filter(p=>!c||(p.categoria||"Geral")===c).length}</span></button>`).join("")}</nav>
       <section class="catalogo-filtros" aria-label="Filtrar produtos">
         <label>Buscar produto<input type="search" id="busca" placeholder="Nome, categoria ou código"></label>
         <label>Exibir<select id="catalogo-situacao"><option value="">Todos os produtos</option><option value="visivel">No cardápio</option><option value="oculto">Fora do cardápio</option><option value="esgotado">Esgotados</option></select></label>
-        <button type="button" class="btn-ghost" id="catalogo-limpar">Limpar filtros</button>
+        <div class="catalogo-filtro-acoes"><button type="button" class="btn-ghost" id="catalogo-limpar">Limpar filtros</button>
+        <button class="btn-primary fit" id="btn-publicar" type="button">Publicar cardápio (${visiveis})</button></div>
       </section>
       <div class="catalogo-feedback"><p id="catalogo-resultados" role="status"></p><p id="catalogo-drafts" role="status"></p></div>
       <div class="prod-list catalogo-list" id="lista"></div>
@@ -832,6 +842,7 @@ export async function renderPainel(app, sessao) {
   }
 
   function pintar() {
+    limparCep();
     main.dataset.aba = aba;
     if (!matchMedia("(prefers-reduced-motion: reduce)").matches) main.animate([{transform:"translateY(7px)",opacity:.65},{transform:"translateY(0)",opacity:1}],{duration:220,easing:"cubic-bezier(.22,1,.36,1)"});
     main.classList.toggle("wide", aba === "pedidos" || aba === "qr");
