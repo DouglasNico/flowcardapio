@@ -22,12 +22,12 @@ export function extrasItem(i) {
     .filter(Boolean);
 }
 
-export function htmlLinhaItem(i) {
+export function htmlLinhaItem(i, { semFoto = false } = {}) {
   const extras = extrasItem(i);
   const foto = i && i.fotoUrl;
   return `
-    <li class="pi">
-      ${foto
+    <li class="pi${semFoto ? " pi-cozinha" : ""}">
+      ${semFoto ? "" : foto
         ? `<img class="pi-foto" src="${esc(foto)}" alt="">`
         : `<div class="pi-foto ph">${ico.photo}</div>`}
       <div class="pi-copy">

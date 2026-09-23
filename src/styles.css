@@ -481,11 +481,12 @@ svg { display: block; }
   position: sticky; bottom: 0; background: #fff; padding-top: 12px;
 }
 .editor-actions .btn-primary { width: auto; min-width: 168px; }
-html.is-locked, body.is-locked {
+html.is-locked {
   overflow: hidden !important;
   overscroll-behavior: none;
 }
-body.is-locked { padding-right: var(--lock-gap, 0px); }
+/* clip blocks body overflow without creating a new sticky scroll container. */
+body.is-locked { overflow: clip !important; overscroll-behavior: none; padding-right: var(--lock-gap, 0px); }
 
 .menu-frame {
   --pad: 16px;
@@ -971,3 +972,16 @@ body.is-locked { padding-right: var(--lock-gap, 0px); }
 }
 
 .back-link{display:inline-flex;align-items:center;gap:6px}.back-link svg{width:18px;height:18px;flex:none}
+/* Dados de entrega rolam com os itens; o total permanece acessível. */
+.checkout-entrega {padding:20px 0;border-top:1px solid var(--line);}
+.checkout-entrega h3 {margin:0 0 12px;font-size:16px;}
+.checkout-entrega p {font-size:12px;line-height:1.5;color:#506078;margin:12px 0;}
+.checkout-modos {display:flex;gap:8px;margin-bottom:16px;}
+.checkout-modos button {flex:1;border:1px solid #cad2dc;border-radius:8px;min-height:44px;background:#fff;color:#15253c;font-weight:650;}
+.checkout-modos button[aria-pressed=true] {background:#15253c;color:#fff;border-color:#15253c;}
+.checkout-entrega label {display:grid;gap:6px;color:#506078;font-size:12px;min-width:0;}
+.checkout-entrega input,.checkout-entrega select {width:100%;min-width:0;min-height:44px;border:1px solid #cad2dc;border-radius:8px;padding:10px;background:#fff;color:#15253c;font:inherit;font-size:16px;}
+.checkout-endereco {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px;}
+.checkout-endereco label:nth-child(3),.checkout-endereco label:last-child {grid-column:1/-1;}
+.delivery-total {display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:space-between;font-size:12px;line-height:1.5;color:#506078;padding-block:8px;}
+.sheet-head,.sheet-foot {flex-shrink:0;}

@@ -1,3 +1,4 @@
+import {telefoneFormatado, calcularEntrega} from "../../shared/entrega.js";
 import { acompanharCategorias } from "../lib/categorias-scroll.js";
 import "./cardapio-design.css";
 import { criarPedido, lerCardapioPublico } from "../lib/pedidos.js";
@@ -78,6 +79,8 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   let buscaExtra = "";
   let carrinho = lerCarrinho(chave, mesa);
   let sheetAberto = false;
+  let modoPedido = mesa ? 'mesa' : 'retirada';
+  const dadosEntrega = {nome:'',telefone:'',rua:'',numero:'',complemento:'',bairroId:''};
   let sheetAnimar = true;
   let animarItem = Boolean(itemId);
   let fechandoItem = false;
@@ -203,6 +206,15 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     }, 0);
   }
 
+  function taxaEntregaAtual() {
+    return modoPedido === 'delivery' ? (Number(publico.delivery?.bairros?.find(b=>b.id===dadosEntrega.bairroId)?.taxaCentavos)||0)/100 : 0;
+  }
+  function totalComEntrega() { return Math.round((totalCarrinho()+taxaEntregaAtual())*100)/100; }
+  function camposEntrega() {
+    if (mesa || !publico.delivery?.ativo) return '';
+    return `<section class="checkout-entrega"><h3>Como quer receber?</h3><div class="checkout-modos"><button type="button" data-modo="retirada" aria-pressed="${modoPedido==='retirada'}">Retirar na loja</button><button type="button" data-modo="delivery" aria-pressed="${modoPedido==='delivery'}">Receber em casa</button></div>${modoPedido==='delivery'?`<p>Entregamos nos bairros cadastrados de ${esc(publico.deliveryCidade||'nossa cidade')} ${esc(publico.deliveryUf||'')}.</p><label>Bairro<select data-entrega="bairroId"><option value="">Escolha seu bairro</option>${(publico.delivery.bairros||[]).map(b=>`<option value="${esc(b.id)}" ${b.id===dadosEntrega.bairroId?'selected':''}>${esc(b.nome)} — ${brl(b.taxaCentavos/100)}</option>`).join('')}</select></label><div class="checkout-endereco">${Object.entries({nome:'Seu nome',telefone:'WhatsApp com DDD',rua:'Rua / avenida',numero:'Número',complemento:'Complemento (opcional)'}).map(([k,label])=>`<label>${label}<input data-entrega="${k}" value="${esc(dadosEntrega[k])}" maxlength="${k==='telefone'?16:100}" ${k==='telefone'?'type="tel" autocomplete="tel-national"':''}></label>`).join('')}</div><p>Pagamento na entrega. A taxa aparece no total abaixo.</p>`:''}</section>`;
+  }
+
   function nItens() {
     return carrinho.reduce((s, i) => s + i.quantidade, 0);
   }
@@ -320,11 +332,13 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const idem = sessionStorage.getItem(`flowpdv_idem_${chave}_${mesa || "r"}`) || crypto.randomUUID();
     sessionStorage.setItem(`flowpdv_idem_${chave}_${mesa || "r"}`, idem);
     try {
+      if (modoPedido === 'delivery') calcularEntrega(publico.delivery, dadosEntrega);
       const res = await criarPedido({
         chave,
-        tipo: mesa ? "mesa" : "retirada",
+        tipo: modoPedido,
         numeroMesa: mesa || null,
         idempotencyKey: idem,
+        entrega: modoPedido === "delivery" ? dadosEntrega : undefined,
         itens: carrinho.map((i) => ({
           id: i.id,
           quantidade: i.quantidade,
@@ -342,9 +356,11 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       guardarPedidoLocal({
         id: pedidoId,
         chaveLicenca: chave,
-        tipo: mesa ? "mesa" : "retirada",
+        tipo: modoPedido,
         numeroMesa: mesa || null,
         status: (res.pedido && res.pedido.status) || "novo",
+        taxaEntrega: res.pedido?.taxaEntrega || 0,
+        subtotal: res.pedido?.subtotal ?? totalCarrinho(),
         total: (res.pedido && res.pedido.total) != null ? res.pedido.total : totalCarrinho(),
         nomeLoja: (res.pedido && res.pedido.nomeLoja) || (publico && publico.nome) || "",
         itens: carrinho.map((i, idx) => {
@@ -371,7 +387,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       const enviarBtn = app.querySelector("#btn-enviar");
       if (enviarBtn) {
         enviarBtn.disabled = false;
-        enviarBtn.textContent = `Enviar pedido · ${brl(totalCarrinho())}`;
+        enviarBtn.textContent = `Enviar pedido · ${brl(totalComEntrega())}`;
       }
     }
   }
@@ -583,13 +599,15 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
           </header>
           <div class="sheet-body">
             ${carrinho.map((i) => htmlCartItem(i, true)).join("")}
+          ${camposEntrega()}
           </div>
           <div class="sheet-foot">
+            ${modoPedido==='delivery'?`<div class="delivery-total"><span>Subtotal ${brl(totalCarrinho())}</span><span id="checkout-taxa">${dadosEntrega.bairroId?'Entrega '+brl(taxaEntregaAtual()):'Selecione o bairro para calcular a entrega'}</span></div>`:''}
             <div class="cart-total">
               <span>Total</span>
-              <strong>${brl(totalCarrinho())}</strong>
+              <strong id="checkout-total">${brl(totalComEntrega())}</strong>
             </div>
-            <button class="btn-primary" id="btn-enviar" type="button">Enviar pedido · ${brl(totalCarrinho())}</button>
+            <button class="btn-primary" id="btn-enviar" type="button">Enviar pedido · ${brl(totalComEntrega())}</button>
             <button class="btn-ghost" id="btn-fechar" type="button">Continuar pedindo</button>
           </div>
         </div>
@@ -908,6 +926,15 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         pintar();
       });
     });
+    app.querySelectorAll('[data-modo]').forEach(btn=>btn.onclick=()=>{modoPedido=btn.dataset.modo;sheetAnimar=false;pintar();});
+    app.querySelectorAll('[data-entrega]').forEach(el=>el.addEventListener('input',()=>{
+      if(el.dataset.entrega==='telefone')el.value=telefoneFormatado(el.value);
+      dadosEntrega[el.dataset.entrega]=el.value;
+      const total=app.querySelector('#checkout-total'), taxa=app.querySelector('#checkout-taxa'), enviar=app.querySelector('#btn-enviar');
+      if(total)total.textContent=brl(totalComEntrega());
+      if(taxa)taxa.textContent=dadosEntrega.bairroId?'Entrega '+brl(taxaEntregaAtual()):'Selecione o bairro para calcular a entrega';
+      if(enviar)enviar.textContent=`Enviar pedido · ${brl(totalComEntrega())}`;
+    }));
     const enviarBtn = app.querySelector("#btn-enviar");
     if (enviarBtn) enviarBtn.addEventListener("click", async () => {
       enviarBtn.disabled = true;

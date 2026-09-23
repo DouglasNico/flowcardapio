@@ -1,3 +1,4 @@
+import {telefoneFormatado, telefoneDigitos, enderecoEstruturado, enderecoTexto, validarEntrega} from "../../shared/entrega.js";
 import QRCode from "qrcode";
 import "./painel-catalogo.css";
 import { ico } from "../lib/icons.js";
@@ -14,7 +15,7 @@ import {
   salvarOverlay
 } from "../lib/overlay.js";
 import { atualizarStatusPedido, escutarPedidosLoja, invalidarCardapioPublico } from "../lib/pedidos.js";
-import { brl, erroAmigavel, originPublico, esc, soDigitos, toast } from "../lib/format.js";
+import { brl, erroAmigavel, originPublico, esc, toast } from "../lib/format.js";
 import { sanitizarGrupos } from "../lib/grupos.js";
 import { horaPedido, htmlLinhaItem } from "../lib/pedido-ui.js";
 import { abrirEditorGrupos } from "./painel-grupos.js";
@@ -83,7 +84,7 @@ export async function renderPainel(app, sessao) {
   let overlays = {};
   let config = {};
   let filtro = "";
-  let categoria = "", situacao = "", carregado = false, publicando = false;
+  let categoria = "", categoriaInicializada = false, situacao = "", carregado = false, publicando = false;
   const rascunhos = new Map(), salvando = new Set(), estados = new Map(), editoresAbertos = new Set();
   let unsubPedidos = null;
   let pedidos = [];
@@ -146,6 +147,13 @@ export async function renderPainel(app, sessao) {
       overlays = overlayMap;
       config = cfg || {};
       produtos = (backup.produtos || []).filter(produtoAtivo);
+      const logo = String(licenca.logoUrl || backup.config?.logoUrl || "");
+      const avatar = app.querySelector('.store-avatar');
+      if (logo && avatar) {
+        const img = document.createElement('img'); img.src = logo; img.alt = '';
+        img.onerror = () => avatar.textContent = nomeDaLoja(licenca).slice(0,1);
+        avatar.replaceChildren(img);
+      }
       carregado = true;
       pintar();
     } catch (err) {
@@ -237,6 +245,8 @@ export async function renderPainel(app, sessao) {
   function pintarLoja() {
     const cfg = lojaDraft || config;
     const form = lerFormatoLoja(cfg);
+    const endereco = enderecoEstruturado(cfg.enderecoDetalhado);
+    const entrega = cfg.delivery || {ativo:false,bairros:[]};
     if (lojaDraft) form.dias = lojaDraft.horarioDias;
     const pickDias = DIAS.map((d) => `
       <button type="button" class="pick${form.dias.includes(d.id) ? " on" : ""}" data-dia="${d.id}">${d.curto}</button>
@@ -295,12 +305,20 @@ export async function renderPainel(app, sessao) {
           <p class="loja-preview-line" id="lj-min-preview">${esc(textoMinimo(form.pedidoMinimoValor))}</p>
         </div>
         <div class="card">
-          <h3>WhatsApp e endereço</h3>
-          <div class="loja-grid">
-            <label>WhatsApp (DDD + número)<input id="lj-wa" inputmode="numeric" placeholder="Digite o telefone com DDD" value="${esc(cfg.whatsapp || "")}"></label>
-            <label>Bairro / endereço<input id="lj-end" placeholder="Informe o endereço comercial" value="${esc(cfg.endereco || "")}"></label>
+          <h3>WhatsApp e endereço da loja</h3>
+          <div class="loja-grid loja-endereco">
+            <label class="span-full">WhatsApp (DDD + número)<input id="lj-wa" type="tel" autocomplete="tel-national" maxlength="16" placeholder="(DDD) número" value="${esc(telefoneFormatado(cfg.whatsapp))}"></label>
+            ${Object.entries({rua:'Rua / avenida',numero:'Número',complemento:'Complemento',bairro:'Bairro',cidade:'Cidade',uf:'UF',cep:'CEP'}).map(([k,label])=>`<label>${label}<input data-endereco="${k}" maxlength="${k==='uf'?2:k==='cep'?9:100}" value="${esc(endereco[k])}" placeholder="${k==='complemento'?'Opcional':label}" ${k==='cep'?'inputmode="numeric"':''}></label>`).join('')}
           </div>
-
+          ${cfg.endereco&&!endereco.rua?`<p class="loja-help">Endereço anterior: ${esc(cfg.endereco)}. Será mantido até você preencher os campos separados.</p>`:''}
+        </div>
+        <div class="card loja-entrega-card">
+          <h3>Entregas por bairro</h3>
+          <label class="delivery-switch"><input type="checkbox" id="lj-delivery" ${entrega.ativo?'checked':''}> Receber pedidos para entrega</label>
+          <p class="loja-help">Cadastre os bairros da sua cidade. A taxa é somada ao pedido do cliente. O repasse é uma referência interna por entrega para o motoboy, sem pagamento automático.</p>
+          <div id="delivery-bairros">${(entrega.bairros||[]).map(b=>`<div class="delivery-bairro" data-bairro-id="${esc(b.id)}"><label>Bairro<input data-bairro-nome value="${esc(b.nome)}" maxlength="80"></label><label>Taxa do cliente (R$)<input data-bairro-taxa type="number" min="0" max="10000" step="0.01" value="${(b.taxaCentavos||0)/100}"></label><label>Repasse motoboy (R$)<input data-bairro-repasse type="number" min="0" max="10000" step="0.01" value="${(b.repasseCentavos||0)/100}"></label><button type="button" class="btn-ghost" data-bairro-remover aria-label="Remover bairro">${ico.close}</button></div>`).join('')}</div>
+          <button type="button" class="btn-ghost" id="lj-add-bairro">Adicionar bairro</button>
+          <p class="loja-help">Taxa zero significa entrega grátis. Bairros não cadastrados não podem finalizar entrega. Pedidos de mesa e retirada não recebem essa taxa.</p>
         </div>
       </div>
     `;
@@ -333,18 +351,25 @@ export async function renderPainel(app, sessao) {
       minPrev.textContent = textoMinimo(st.pedidoMinimoValor);
     }
 
+    function contatoEntrega() {
+      const enderecoDetalhado = enderecoEstruturado(Object.fromEntries([...main.querySelectorAll('[data-endereco]')].map(el=>[el.dataset.endereco,el.value])));
+      const bairros = [...main.querySelectorAll('[data-bairro-id]')].map(row=>({id:row.dataset.bairroId,nome:row.querySelector('[data-bairro-nome]').value,taxaCentavos:Math.round(Number(row.querySelector('[data-bairro-taxa]').value)*100),repasseCentavos:Math.round(Number(row.querySelector('[data-bairro-repasse]').value)*100)}));
+      return {whatsapp:telefoneDigitos(main.querySelector('#lj-wa').value),enderecoDetalhado,endereco:enderecoDetalhado.rua ? enderecoTexto(enderecoDetalhado) : cfg.endereco||enderecoTexto(enderecoDetalhado),delivery:{ativo:main.querySelector('#lj-delivery').checked,bairros}};
+    }
     function salvarHorario() {
       lojaDraft = {...config, ...patchLoja(estadoForm()),
         pausado: main.querySelector("#pausado").checked,
-        whatsapp: main.querySelector("#lj-wa").value,
-        endereco: main.querySelector("#lj-end").value};
+        ...contatoEntrega()};
       saved.textContent = "Alterações não salvas.";
       saved.dataset.error = "false";
       saveButton.disabled = false;
       main.querySelectorAll(".pick").forEach(b=>b.setAttribute("aria-pressed", String(b.classList.contains("on"))));
     }
     main.querySelector("#pausado").addEventListener("change", salvarHorario);
-    ["#lj-wa", "#lj-end", "#lj-abre", "#lj-fecha", "#lj-min-val"].forEach(sel=>main.querySelector(sel).addEventListener("input", salvarHorario));
+    main.querySelector('#lj-wa').addEventListener('input',e=>{e.target.value=telefoneFormatado(e.target.value);});
+    main.querySelectorAll('#lj-wa, [data-endereco], #lj-abre, #lj-fecha, #lj-min-val, #lj-delivery, [data-bairro-id] input').forEach(el=>el.addEventListener('input',salvarHorario));
+    main.querySelector('#lj-add-bairro').onclick=()=>{salvarHorario();lojaDraft.delivery.bairros.push({id:crypto.randomUUID(),nome:'',taxaCentavos:0,repasseCentavos:0});pintarLoja();main.querySelector('[data-bairro-id]:last-child input').focus();};
+    main.querySelectorAll('[data-bairro-remover]').forEach(btn=>btn.onclick=()=>{const id=btn.closest('[data-bairro-id]').dataset.bairroId;salvarHorario();lojaDraft.delivery.bairros=lojaDraft.delivery.bairros.filter(b=>b.id!==id);pintarLoja();});
     main.querySelectorAll(".pick").forEach(b=>b.setAttribute("aria-pressed", String(b.classList.contains("on"))));
 
     main.querySelectorAll("[data-hpreset]").forEach((btn) => {
@@ -404,8 +429,13 @@ export async function renderPainel(app, sessao) {
         saved.textContent = "Escolha pelo menos um dia, preencha os horários e informe um mínimo válido.";
         saved.dataset.error = "true"; return;
       }
-      const patch = {...patchLoja(st), pausado:main.querySelector("#pausado").checked,
-        whatsapp:soDigitos(main.querySelector("#lj-wa").value), endereco:main.querySelector("#lj-end").value.trim().slice(0,120)};
+      const patch = {...patchLoja(st), pausado:main.querySelector("#pausado").checked, ...contatoEntrega()};
+      try {
+        if (patch.whatsapp && ![10,11].includes(patch.whatsapp.length)) throw new Error('Informe um WhatsApp com DDD válido.');
+        if ([...main.querySelectorAll('[data-bairro-id] input')].some(el=>!el.validity.valid)) throw new Error('Revise os valores das taxas e repasses.');
+        patch.delivery = validarEntrega(patch.delivery);
+        if (patch.delivery.ativo && (!patch.enderecoDetalhado.cidade || !/^[A-Za-z]{2}$/.test(patch.enderecoDetalhado.uf))) throw new Error('Preencha a cidade e UF da loja para ativar as entregas.');
+      } catch(err) { saved.textContent=err.message; saved.dataset.error='true'; return; }
       salvandoLoja = true;
       main.querySelectorAll("input,button").forEach(e=>e.disabled=true);
       app.querySelectorAll(".tabs button, #btn-sair").forEach(e=>e.disabled=true);
@@ -429,6 +459,7 @@ export async function renderPainel(app, sessao) {
   function pintarCardapio() {
     const visiveis = produtos.filter((p) => overlays[p.id] && overlays[p.id].visivel).length;
     const categorias = [...new Set(produtos.map(p=>p.categoria||"Geral"))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+    if (!categoriaInicializada && categorias.length) { categoria = categorias[0]; categoriaInicializada = true; }
     main.innerHTML = `
       <section class="page-head catalogo-head">
         <div>
@@ -438,18 +469,21 @@ export async function renderPainel(app, sessao) {
         </div>
         <button class="btn-primary fit" id="btn-publicar" type="button">Publicar cardápio (${visiveis})</button>
       </section>
+      <nav class="catalogo-categorias" aria-label="Categorias do cardápio">${["",...categorias].map(c=>`<button type="button" data-categoria="${esc(c)}" aria-pressed="${categoria===c}">${esc(c||"Todos")}<span>${produtos.filter(p=>!c||(p.categoria||"Geral")===c).length}</span></button>`).join("")}</nav>
       <section class="catalogo-filtros" aria-label="Filtrar produtos">
         <label>Buscar produto<input type="search" id="busca" placeholder="Nome, categoria ou código"></label>
-        <label>Categoria<select id="catalogo-categoria"><option value="">Todas as categorias</option>${categorias.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select></label>
         <label>Exibir<select id="catalogo-situacao"><option value="">Todos os produtos</option><option value="visivel">No cardápio</option><option value="oculto">Fora do cardápio</option><option value="esgotado">Esgotados</option></select></label>
         <button type="button" class="btn-ghost" id="catalogo-limpar">Limpar filtros</button>
       </section>
       <div class="catalogo-feedback"><p id="catalogo-resultados" role="status"></p><p id="catalogo-drafts" role="status"></p></div>
       <div class="prod-list catalogo-list" id="lista"></div>
     `;
-    main.querySelector("#catalogo-categoria").value = categoria;
+    main.querySelectorAll('[data-categoria]').forEach(btn=>btn.onclick=()=>{
+      categoria=btn.dataset.categoria;
+      main.querySelectorAll('[data-categoria]').forEach(b=>b.setAttribute('aria-pressed',String(b===btn)));
+      pintarLista();
+    });
     main.querySelector("#catalogo-situacao").value = situacao;
-    main.querySelector("#catalogo-categoria").onchange = e=>{categoria=e.target.value;pintarLista();};
     main.querySelector("#catalogo-situacao").onchange = e=>{situacao=e.target.value;pintarLista();};
     main.querySelector("#catalogo-limpar").onclick = ()=>{filtro="";categoria="";situacao="";pintarCardapio();main.querySelector("#busca").focus();};
     const busca = main.querySelector("#busca");
@@ -493,18 +527,17 @@ export async function renderPainel(app, sessao) {
       const foto = ov.fotoUrl ? `<img class="thumb" src="${esc(ov.fotoUrl)}" alt="">` : `<div class="thumb">${esc((p.nome || "?").slice(0, 1))}</div>`;
       return `
         <article class="prod-card ${ov.visivel ? "on" : ""}" data-id="${esc(p.id)}">
-          <div class="thumb-wrap">
+          <div class="produto-midia"><div class="thumb-wrap">
             ${foto}
             <span class="thumb-load">Enviando foto...</span>
-          </div>
+          </div><div class="produto-foto-acoes"><button type="button" class="btn-ghost" data-add-foto>${ico.photo}${ov.fotoUrl ? "Trocar foto" : "Adicionar foto"}</button><input data-foto-input type="file" accept="image/jpeg,image/png,image/webp" hidden>${ov.fotoUrl || ov.fotoPublicId ? `<button type="button" class="btn-ghost foto-remover" data-del-foto>Remover foto</button>` : ""}</div></div>
           <div class="prod-card-body">
             <div class="prod-card-top">
               <h3>${esc(p.nome || "Sem nome")}</h3>
               <b>${brl(precoProduto(p))}</b>
             </div>
             <div class="cat">${esc(p.categoria || "Geral")}${nOp ? ` · ${nOp} grupo${nOp > 1 ? "s" : ""} de opção` : ""}${ov.destaque ? " · Destaque" : ""}</div>
-            <details class="produto-editor" ${editoresAbertos.has(String(p.id)) || rascunhos.has(String(p.id)) ? "open" : ""}><summary>Editar descrição ${ico.chevron}</summary><label class="catalogo-desc">Descrição para o cliente<textarea data-desc placeholder="Ingredientes, preparo ou detalhes do produto"></textarea></label>
-            <div class="catalogo-save"><button type="button" class="btn-ghost" data-save-desc>Salvar descrição</button><span data-save-state role="status">${esc(estados.get(String(p.id))||"")}</span></div></details>
+
             <div class="prod-card-foot">
               <div class="chip-row">
                 <label class="chip${ov.visivel ? " on" : ""}"><input type="checkbox" data-visivel ${ov.visivel ? "checked" : ""}> No cardápio</label>
@@ -512,11 +545,14 @@ export async function renderPainel(app, sessao) {
                 <label class="chip warn${ov.esgotado ? " on" : ""}"><input type="checkbox" data-esgotado ${ov.esgotado ? "checked" : ""}> Esgotado</label>
               </div>
               <div class="prod-card-actions">
-                <div class="produto-foto-acoes"><button type="button" class="btn-ghost" data-add-foto>${ico.photo}${ov.fotoUrl ? "Trocar foto" : "Adicionar foto"}</button><input data-foto-input type="file" accept="image/jpeg,image/png,image/webp" hidden>${ov.fotoUrl || ov.fotoPublicId ? `<button type="button" class="btn-ghost foto-remover" data-del-foto>Remover foto</button>` : ""}</div>
+
                 <button type="button" class="btn-ghost" data-opcoes>Opções${nOp ? ` (${nOp})` : ""}</button>
               </div>
             </div>
           </div>
+
+            <details class="produto-editor" ${editoresAbertos.has(String(p.id)) || rascunhos.has(String(p.id)) ? "open" : ""}><summary>Editar descrição ${ico.chevron}</summary><label class="catalogo-desc">Descrição para o cliente<textarea data-desc placeholder="Ingredientes, preparo ou detalhes do produto"></textarea></label>
+            <div class="catalogo-save"><button type="button" class="btn-ghost" data-save-desc>Salvar descrição</button><span data-save-state role="status">${esc(estados.get(String(p.id))||"")}</span></div></details>
         </article>
       `;
     }).join("");
@@ -590,19 +626,11 @@ export async function renderPainel(app, sessao) {
     });
   }
 
-  function fotoItemPedido(i) {
-    if (i && i.fotoUrl) return i.fotoUrl;
-    const ov = overlays[i && i.id] || overlays[String(i && i.id)];
-    if (ov && ov.fotoUrl) return ov.fotoUrl;
-    const p = produtos.find((x) => String(x.id) === String(i && i.id));
-    return (p && (p.fotoUrl || p.imagem)) || "";
-  }
-
   function htmlCardPedido(p) {
     const prox = proximoStatus(p.status);
-    const onde = p.tipo === "mesa" ? `Mesa ${p.numeroMesa}` : CANAL_LOJA;
+    const onde = p.tipo === "mesa" ? `Mesa ${p.numeroMesa}` : p.tipo === "delivery" ? "Entrega" : "Retirada";
     const hora = horaPedido(p.at || p.atualizadoEm);
-    const itens = (p.itens || []).map((i) => htmlLinhaItem({ ...i, fotoUrl: fotoItemPedido(i) })).join("");
+    const itens = (p.itens || []).map((i) => htmlLinhaItem(i, {semFoto:true})).join("");
     return `
       <article class="k-card" data-id="${esc(p.id)}">
         <header>
@@ -612,6 +640,7 @@ export async function renderPainel(app, sessao) {
           </div>
           <span class="badge ${esc(p.status || "novo")}">${esc(rotuloStatus(p.status))}</span>
         </header>
+        ${p.tipo==='delivery'?`<div class="pedido-entrega"><strong>${esc(p.cliente?.nome||'Cliente')}</strong><p>${esc(telefoneFormatado(p.cliente?.telefone))}</p><p>${esc(enderecoTexto(p.endereco))}</p><small>Taxa: ${brl(p.taxaEntrega||0)} · Repasse motoboy: ${brl(p.repasseMotoboy||0)}</small></div>`:''}
         <ul class="pi-list">${itens}</ul><p class="pedido-feedback" role="status">${esc(pedidosSalvando.has(p.id) ? "Atualizando pedido…" : pedidosErros.get(p.id) || "")}</p>
         <footer>
           <b>${brl(p.total)}</b>

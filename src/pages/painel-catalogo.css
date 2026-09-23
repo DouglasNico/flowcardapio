@@ -129,3 +129,51 @@ body.is-painel {--bg:#f6f7f9;--line:#dfe4eb;--navy:#15253c;--slate:#506078;--mut
 .is-painel .produto-foto-acoes svg {width:17px;height:17px;}
 .is-painel .produto-foto-acoes .foto-remover {color:#a33329;border-color:#e5c6c1;}
 .is-painel .produto-foto-acoes .foto-remover:hover {background:#fff1ef;border-color:#cb8d84;}
+/* Categoria é navegação; ações de imagem ficam junto da foto. */
+.is-painel .painel-brand>img {align-self:center;}
+.is-painel .store-avatar {width:40px;height:40px;overflow:hidden;}
+.is-painel .store-avatar img {width:100%;height:100%;object-fit:contain;background:#fff;}
+.is-painel .catalogo-categorias {display:flex;gap:8px;overflow-x:auto;padding:3px 3px 14px;margin-bottom:12px;scrollbar-width:thin;}
+.is-painel .catalogo-categorias button {display:flex;align-items:center;gap:10px;flex:none;min-height:44px;border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:#fff;color:#506078;font-size:13px;font-weight:650;}
+.is-painel .catalogo-categorias button:hover {background:#e9eef4;}
+.is-painel .catalogo-categorias button[aria-pressed=true] {background:#15253c;color:#fff;border-color:#15253c;}
+.is-painel .catalogo-categorias button span {font-size:11px;opacity:.85;}
+.is-painel .catalogo-filtros {grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto;}
+.is-painel .catalogo-list .prod-card {grid-template-columns:128px minmax(0,1fr);gap:16px 20px;}
+.is-painel .produto-midia {min-width:0;display:grid;gap:10px;align-content:start;}
+.is-painel .produto-midia .thumb-wrap {width:100%;height:auto;aspect-ratio:1;}
+.is-painel .produto-foto-acoes {display:grid;gap:6px;}
+.is-painel .produto-foto-acoes .btn-ghost {width:100%;justify-content:center;min-height:40px;padding:8px 6px;font-size:11px;}
+.is-painel .produto-editor {grid-column:1/-1;margin-top:0;}
+.is-painel .prod-card-actions .btn-ghost {min-height:44px;font-size:12px;padding:10px 12px;}
+.is-painel .pi-cozinha {grid-template-columns:minmax(0,1fr);padding:12px 0;border-bottom:1px solid #e5e9ef;}
+.is-painel .pi-cozinha:last-child {border-bottom:0;}
+.is-painel .pi-list {gap:0;}
+.is-painel .pi-cozinha strong {font-size:14px;line-height:1.5;}
+.is-painel .pi-cozinha small {line-height:1.55;margin-top:4px;color:#526279;}
+.is-painel .pi-cozinha .pi-obs {background:#fff4e6;color:#7e471a;padding:6px 8px;border-radius:5px;}
+.is-painel .loja-endereco {grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.is-painel .span-full,.is-painel .loja-entrega-card {grid-column:1/-1;}
+.is-painel .delivery-switch {display:flex;align-items:center;gap:10px;margin:16px 0;}
+.is-painel .delivery-switch input {min-height:0;width:18px;height:18px;}
+.is-painel .delivery-bairro {display:grid;grid-template-columns:minmax(0,1.5fr) repeat(2,minmax(0,1fr)) auto;gap:12px;align-items:end;padding:16px 0;border-top:1px solid var(--line);}
+.is-painel .delivery-bairro label {min-width:0;display:grid;gap:8px;font-size:12px;color:#506078;}
+.is-painel .delivery-bairro input {width:100%;padding:10px;}
+.is-painel .delivery-bairro button {min-width:44px;min-height:44px;color:#a33329;}
+.is-painel .delivery-bairro svg {width:18px;height:18px;}
+.is-painel .pedido-entrega {margin:12px 0;padding:12px;background:#f3f6f9;border-radius:8px;overflow-wrap:anywhere;}
+.is-painel .pedido-entrega p {font-size:12px;line-height:1.5;margin:6px 0;}
+.is-painel .pedido-entrega small {font-size:11px;color:#506078;}
+@media(max-width:800px) {
+ .is-painel .painel-brand>img {align-self:auto;}
+ .is-painel .store-avatar {display:grid;}
+ .is-painel .catalogo-filtros {grid-template-columns:minmax(0,1fr);}
+ .is-painel .catalogo-filtros label:first-child {grid-column:auto;}
+ .is-painel .catalogo-filtros button {grid-column:auto;}
+ .is-painel .delivery-bairro {grid-template-columns:repeat(2,minmax(0,1fr));}
+ .is-painel .delivery-bairro label:first-child {grid-column:1/-1;}
+ .is-painel .delivery-bairro button {justify-self:end;grid-column:2;}
+ .is-painel .catalogo-list .prod-card {grid-template-columns:100px minmax(0,1fr);gap:14px;}
+ .is-painel .loja-endereco {grid-template-columns:minmax(0,1fr);}
+}
+@media(max-width:360px) {.is-painel .catalogo-list .prod-card {grid-template-columns:88px minmax(0,1fr);gap:10px;padding:12px;}.is-painel .produto-foto-acoes .btn-ghost {font-size:10px;}.is-painel .produto-foto-acoes svg {display:none;}}

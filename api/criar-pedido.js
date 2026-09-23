@@ -1,3 +1,4 @@
+import { calcularEntrega } from "../shared/entrega.js";
 import {
   emailDaLoja,
   firebaseConfig,
@@ -97,6 +98,11 @@ async function createDocRest(path, documentId, obj, token) {
   return data;
 }
 
+function respostaCliente(id, pedido) {
+  const {repasseMotoboy, cliente, endereco, ...publico} = pedido;
+  return {id, ...publico};
+}
+
 export default async function handler(req, res) {
   if (preflight(req, res)) return;
   if (req.method !== "POST") return json(res, 405, { error: "Use POST." });
@@ -105,9 +111,8 @@ export default async function handler(req, res) {
     const chave = normalizarChave(req.body && req.body.chave);
     if (!chave) return json(res, 400, { error: "Informe a chave da loja." });
 
-    const tipo = String((req.body && req.body.tipo) || "mesa").toLowerCase() === "retirada"
-      ? "retirada"
-      : "mesa";
+    const tipo = String(req.body?.tipo || 'mesa').toLowerCase();
+    if (!['mesa','retirada','delivery'].includes(tipo)) return json(res,400,{error:'Tipo de pedido inválido.'});
     const numeroMesa = parseInt(req.body && req.body.numeroMesa, 10);
     if (tipo === "mesa" && (!Number.isFinite(numeroMesa) || numeroMesa < 1)) {
       return json(res, 400, { error: "Informe o número da mesa." });
@@ -122,7 +127,7 @@ export default async function handler(req, res) {
     const chavePath = encodeURIComponent(chave);
     const existente = await getDocRest(`backups_lojas/${chavePath}/pedidos/${encodeURIComponent(pedidoId)}`, token);
     if (existente) {
-      return json(res, 200, { ok: true, reused: true, id: pedidoId, pedido: { id: pedidoId, ...existente } });
+      return json(res, 200, { ok: true, reused: true, id: pedidoId, pedido: respostaCliente(pedidoId, existente) });
     }
 
     const publico = await getDocRest(`cardapio_publico/${chavePath}`, token);
@@ -170,15 +175,30 @@ export default async function handler(req, res) {
       total += precoUnitario * quantidade;
     }
 
+    const subtotal = Math.round(total*100)/100;
+    let delivery = {};
+    if (tipo === 'delivery') {
+      const cfg = await getDocRest(`cardapio_config/${chavePath}`, token);
+      try {
+        delivery = calcularEntrega(cfg?.delivery, req.body?.entrega);
+        delivery.endereco.cidade = String(cfg?.enderecoDetalhado?.cidade || '');
+        delivery.endereco.uf = String(cfg?.enderecoDetalhado?.uf || '').toUpperCase();
+        const minimo = Number(cfg?.pedidoMinimoValor)||0;
+        if (subtotal < minimo) throw new Error(`O pedido mínimo para entrega é R$ ${minimo.toFixed(2).replace('.',',')}.`);
+      } catch(err) { return json(res,400,{error:err.message}); }
+      total = Math.round((subtotal+delivery.taxaEntrega)*100)/100;
+    }
     const agora = new Date().toISOString();
     const pedido = {
       chaveLicenca: chave,
       tipo,
+      subtotal,
+      ...delivery,
       numeroMesa: tipo === "mesa" ? numeroMesa : null,
       itens,
       total,
       status: "novo",
-      pagamento: "na_caixa",
+      pagamento: tipo === "delivery" ? "na_entrega" : "na_caixa",
       origem: "cardapio",
       nomeLoja: String(publico.nome || ""),
       at: agora,
@@ -188,6 +208,8 @@ export default async function handler(req, res) {
       chaveLicenca: chave,
       tipo,
       numeroMesa: pedido.numeroMesa,
+      subtotal,
+      taxaEntrega: delivery.taxaEntrega || 0,
       status: "novo",
       total,
       nomeLoja: pedido.nomeLoja,
@@ -208,7 +230,7 @@ export default async function handler(req, res) {
 
     await createDocRest(`backups_lojas/${chavePath}/pedidos`, pedidoId, pedido, token);
     await createDocRest("cardapio_pedidos", pedidoId, publicoPedido, token);
-    return json(res, 200, { ok: true, reused: false, id: pedidoId, pedido: { id: pedidoId, ...pedido } });
+    return json(res, 200, { ok: true, reused: false, id: pedidoId, pedido: respostaCliente(pedidoId, pedido) });
   } catch (err) {
     return json(res, err.status || 500, { error: err.message || "Falha ao criar o pedido." });
   }

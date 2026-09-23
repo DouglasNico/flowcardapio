@@ -1,3 +1,4 @@
+import { entregaPublica } from "../../shared/entrega.js";
 import {
   collection,
   doc,
@@ -57,6 +58,11 @@ export async function salvarConfig(chave, patch) {
   CAMPOS_PUBLICOS.forEach((k) => {
     if (Object.prototype.hasOwnProperty.call(patch, k)) next[k] = patch[k];
   });
+  if (patch.delivery) {
+    next.delivery = entregaPublica(patch.delivery);
+    next.deliveryCidade = String(patch.enderecoDetalhado?.cidade || '');
+    next.deliveryUf = String(patch.enderecoDetalhado?.uf || '').toUpperCase();
+  }
   if (Object.keys(next).length > 1) {
     await setDoc(pubRef, next, { merge: true });
   }
@@ -109,12 +115,15 @@ export async function publicarCardapio(chave) {
     nome: nomeDaLoja(licenca),
     logoUrl: String(licenca.logoUrl || cfgLoja.logoUrl || ""),
     pausado: Boolean(config.pausado),
+    delivery: entregaPublica(config.delivery),
+    deliveryCidade: String(config.enderecoDetalhado?.cidade || ''),
+    deliveryUf: String(config.enderecoDetalhado?.uf || '').toUpperCase(),
     taxaServico: Number(config.taxaServico) === 0 ? 0 : (Number(config.taxaServico) || 10),
     whatsapp: soDigitos(config.whatsapp || cfgLoja.whatsapp || licenca.whatsapp || licenca.whatsApp || ""),
     horarioTexto: String(config.horarioTexto || "").slice(0, 80),
     entregaTexto: String(config.entregaTexto || "").slice(0, 80),
     pedidoMinimoTexto: String(config.pedidoMinimoTexto != null ? config.pedidoMinimoTexto : "Sem pedido mínimo").slice(0, 60),
-    endereco: String(config.endereco || licenca.endereco || licenca.cidade || "").slice(0, 120),
+    endereco: String(config.endereco || licenca.endereco || licenca.cidade || "").slice(0, 500),
     produtos: publicados,
     publicadoEm: new Date().toISOString()
   });

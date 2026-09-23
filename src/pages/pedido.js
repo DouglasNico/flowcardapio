@@ -45,11 +45,12 @@ export function renderPedido(app, { chave, pedidoId }) {
       timerNotFound = null;
     }
     guardarPedidoLocal(pedido);
-    document.title = `${pedido.nomeLoja || "Pedido"} · ${ROTULO[pedido.status] || "Pedido"}`;
+    const rotulo = pedido.tipo === "delivery" && pedido.status === "pronto" ? "Pronto para entrega" : ROTULO[pedido.status] || pedido.status || "Pedido";
+    document.title = `${pedido.nomeLoja || "Pedido"} · ${rotulo}`;
     const cancelado = pedido.status === "cancelado";
     const idx = indiceStatus(pedido.status);
     const voltar = `/${chave}${pedido.numeroMesa ? `/mesa/${pedido.numeroMesa}` : ""}`;
-    const canal = pedido.tipo === "mesa" ? `Mesa ${pedido.numeroMesa}` : CANAL_LOJA;
+    const canal = pedido.tipo === "mesa" ? `Mesa ${pedido.numeroMesa}` : pedido.tipo === "delivery" ? "Entrega em casa" : "Retirada na loja";
     const itens = (pedido.itens || []).map((i) => htmlLinhaItem(i)).join("");
     app.innerHTML = `
       <div class="menu-frame">
@@ -63,8 +64,8 @@ export function renderPedido(app, { chave, pedidoId }) {
             </div>
           </header>
           <div class="track-card">
-            <p class="badge ${esc(pedido.status || "novo")}">${esc(ROTULO[pedido.status] || pedido.status)}</p>
-            <h2 class="track-title">${esc(AJUDA[pedido.status] || "Acompanhe o andamento.")}</h2>
+            <p class="badge ${esc(pedido.status || "novo")}">${esc(rotulo)}</p>
+            <h2 class="track-title">${esc(pedido.tipo==="delivery" && pedido.status==="pronto" ? "Pedido pronto. Aguarde a entrega da loja." : AJUDA[pedido.status] || "Acompanhe o andamento.")}</h2>
             <p class="track-id">Pedido ${esc(String(pedido.id || pedidoId || "").replace(/^PED-/, "").slice(-6).toUpperCase())}</p>
             ${cancelado ? "" : `
               <ol class="steps">
@@ -72,7 +73,7 @@ export function renderPedido(app, { chave, pedidoId }) {
               </ol>
             `}
             <ul class="track-itens">${itens}</ul>
-            <div class="track-total"><span>Total</span><strong>${brl(pedido.total)}</strong></div>
+            ${pedido.tipo==="delivery"?`<p class="track-taxa">Entrega: ${brl(pedido.taxaEntrega||0)} · incluída no total</p>`:""}<div class="track-total"><span>Total</span><strong>${brl(pedido.total)}</strong></div>
             <a class="btn-primary" href="${esc(voltar)}">${ico.back} Pedir de novo</a>
           </div>
         </div>
