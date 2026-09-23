@@ -17,7 +17,10 @@
   object-fit:cover;transform:scale(var(--foto-zoom,1));
   transform-origin:var(--foto-x,50%) var(--foto-y,50%);z-index:1;background:transparent;
 }
-.foto-produto.foto-produto[data-modo="inteira"] > .foto-frente {object-fit:contain;}
+.foto-produto.foto-produto[data-modo="inteira"] > .foto-frente {
+  object-fit:contain;object-position:center;transform-origin:center;
+  transform:translate(calc(var(--foto-x,50%) - 50%),calc(var(--foto-y,50%) - 50%)) scale(var(--foto-zoom,1));
+}
 .is-menu .spot-media > .foto-produto {height:190px;}
 .is-menu .menu-media > .foto-produto {border-radius:10px;}
 @media (max-width:600px) {.is-menu .spot-media > .foto-produto {height:176px;}}

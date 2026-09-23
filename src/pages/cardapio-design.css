@@ -58,6 +58,7 @@ body.is-menu {--frame:1120px;--paper:#fffdf9;--line:#e6e1d9;--slate:#615e58;--mu
 .is-menu .btn-primary {background:#b84415;border-radius:9px;min-height:46px;font-size:13px;font-weight:650;}
 .is-menu .btn-primary:hover:not(:disabled) {background:#a43a0f;filter:none;transform:none;}
 .is-menu .sheet,.is-menu .prod-overlay {background:#172b2459;backdrop-filter:none;-webkit-backdrop-filter:none;}
+.is-menu .prod-overlay {backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}
 .is-menu .sheet-card {border-radius:16px 16px 0 0;box-shadow:none;max-width:520px;}
 .is-menu .prod-page {max-width:560px;margin:auto;border-radius:14px;height:min(850px,94dvh);box-shadow:0 24px 70px #15271d30;}
 .is-menu .prod-hero {height:240px;flex-basis:240px;}

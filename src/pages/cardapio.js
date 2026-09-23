@@ -264,6 +264,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
 
   function fecharItem() {
     if (fechandoItem) return;
+    const idFechado = String(itemAtual);
     const overlay = overlayEl();
     const url = pathLista();
     let done = false;
@@ -277,6 +278,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       travarFundo(false);
       if (overlay && overlay.parentNode) overlay.remove();
       pintarLista();
+      [...app.querySelectorAll("[data-open]")].find(el => el.dataset.open === idFechado)?.focus({ preventScroll: true });
     };
     if (overlay && !reduzMovimento()) {
       fechandoItem = true;
@@ -1029,6 +1031,12 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   }
 
   pintar();
+  function fecharComEscape(ev) {
+    if (ev.key !== "Escape" || ev.defaultPrevented || ev.isComposing || !itemAtual) return;
+    ev.preventDefault();
+    fecharItem();
+  }
+  window.addEventListener("keydown", fecharComEscape);
   window.addEventListener('scroll', acompanharBusca, {passive:true});
-  return () => { window.removeEventListener('scroll', acompanharBusca); limparCarrossel(); limparCategorias(); overlayEl()?.remove(); travarFundo(false); };
+  return () => { window.removeEventListener("keydown", fecharComEscape); window.removeEventListener('scroll', acompanharBusca); limparCarrossel(); limparCategorias(); overlayEl()?.remove(); travarFundo(false); };
 }

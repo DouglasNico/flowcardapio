@@ -9,9 +9,11 @@ test("fotos antigas mantêm recorte central; metadados inválidos têm limites s
   assert.deepEqual(normalizarEnquadramento({ zoom: NaN, x: Infinity, y: "url(x)" }), normalizarEnquadramento());
 });
 
-test("foto inteira preserva zoom e mantém a posição centralizada", () => {
+test("foto inteira preserva zoom e posição escolhidos, com limites seguros", () => {
   assert.deepEqual(normalizarEnquadramento({ modo: "inteira", zoom: 3, x: 0, y: 100 }),
-    { modo: "inteira", zoom: 3, x: 50, y: 50 });
+    { modo: "inteira", zoom: 3, x: 0, y: 100 });
+  assert.deepEqual(normalizarEnquadramento({ modo: "inteira", x: -5, y: 200 }),
+    { modo: "inteira", zoom: 1, x: 0, y: 100 });
   assert.equal(normalizarEnquadramento({ modo: "inteira" }).zoom, 1);
   assert.equal(normalizarEnquadramento({ modo: "inteira", zoom: 5 }).zoom, 3);
 });

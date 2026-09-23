@@ -12,8 +12,8 @@ export function normalizarEnquadramento(valor) {
   return {
     modo,
     zoom: limitar(v.zoom, 1, 3, 1),
-    x: modo === "inteira" ? 50 : limitar(v.x, 0, 100, 50),
-    y: modo === "inteira" ? 50 : limitar(v.y, 0, 100, 50)
+    x: limitar(v.x, 0, 100, 50),
+    y: limitar(v.y, 0, 100, 50)
   };
 }
 

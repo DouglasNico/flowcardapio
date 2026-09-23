@@ -16,15 +16,15 @@ export function abrirEditorFoto({ nome, fotoUrl, enquadramento, onSave, onClose 
   let comFundo = ajuste.modo === "inteira" ? { ...ajuste } : normalizarEnquadramento({ modo: "inteira" });
   let salvando = false, pronta = false, arraste = null;
   dialog.innerHTML = `
-    <header class="editor-foto-top"><div><h2 id="editor-foto-titulo">Ajustar foto</h2><p>${esc(nome)}</p></div>
+    <header class="editor-foto-top"><h2 id="editor-foto-titulo" title="Ajustar foto - ${esc(nome)}"><span>Ajustar foto -</span> <span class="editor-foto-nome">${esc(nome)}</span></h2>
       <button type="button" class="btn-ghost" data-fechar aria-label="Fechar ajuste da foto">${ico.close}</button></header>
     <div class="editor-foto-body">
-      <fieldset class="foto-modos"><legend>Como mostrar a foto</legend>
+      <fieldset class="foto-modos" aria-label="Como mostrar a foto">
         <label><input type="radio" name="foto-modo" value="inteira"> <span><b>Foto inteira</b><small>Bordas com fundo desfocado</small></span></label>
         <label><input type="radio" name="foto-modo" value="preencher"> <span><b>Preencher espaço</b><small>Recorte com zoom e posição</small></span></label>
       </fieldset>
       <div class="foto-previas">
-        <figure><figcaption>No carrossel</figcaption><div class="foto-previa foto-previa-ampla" data-previa></div></figure>
+        <figure><figcaption>No carrossel (Mais pedidos)</figcaption><div class="foto-previa foto-previa-ampla" data-previa></div></figure>
         <figure><figcaption>Na lista de produtos</figcaption><div class="foto-previa foto-previa-quadrada" data-previa></div></figure>
       </div>
       <p class="foto-dica" data-dica></p>
@@ -34,7 +34,6 @@ export function abrirEditorFoto({ nome, fotoUrl, enquadramento, onSave, onClose 
         <label>Vertical <output data-valor="y"></output><input type="range" data-ajuste="y" aria-label="Posição vertical" min="0" max="100" step="1"></label>
       </fieldset>
       <button type="button" class="btn-ghost" data-reset>Restaurar enquadramento</button>
-      <p class="foto-nota">A imagem original é preservada. Depois de salvar, publique o cardápio para mostrar o ajuste aos clientes.</p>
       <p class="foto-erro" role="alert" data-erro></p>
     </div>
     <footer class="editor-foto-foot"><button type="button" class="btn-ghost" data-cancelar>Cancelar</button><button type="button" class="btn-primary" data-salvar disabled>Salvar enquadramento</button></footer>`;
@@ -51,20 +50,20 @@ export function abrirEditorFoto({ nome, fotoUrl, enquadramento, onSave, onClose 
     dialog.querySelectorAll("[data-previa]").forEach(pre => {
       if (recriar) pre.innerHTML = htmlFoto({ fotoUrl, fotoEnquadramento: ajuste });
       else pre.firstElementChild.style.cssText = estiloEnquadramento(ajuste);
-      pre.classList.toggle("pode-arrastar", !inteira);
+      pre.classList.toggle("pode-arrastar", !salvando);
     });
     dialog.querySelectorAll("[name=foto-modo]").forEach(input => input.checked = input.value === ajuste.modo);
     dialog.querySelector(".foto-controles").disabled = salvando;
     dialog.querySelectorAll("[data-ajuste]").forEach(input => {
       const key = input.dataset.ajuste;
-      input.disabled = salvando || (inteira && key !== "zoom");
+      input.disabled = salvando;
       input.value = ajuste[key];
       const texto = key === "zoom" ? `${ajuste.zoom.toFixed(2).replace(".", ",")}×` : `${Math.round(ajuste[key])}%`;
       dialog.querySelector(`[data-valor="${key}"]`).textContent = texto;
       input.setAttribute("aria-valuetext", texto);
     });
     dialog.querySelector("[data-dica]").textContent = inteira
-      ? "Em 1×, a foto aparece inteira. Aumente o zoom para aproximar; as bordas podem ser recortadas. O fundo desfocado é mantido."
+      ? "Arraste a foto ou use zoom e posição. O fundo desfocado é mantido; as prévias mostram o recorte final."
       : "Arraste a foto em uma prévia ou use os controles para ajustar o recorte.";
   }
   atualizar(true);
@@ -90,18 +89,22 @@ export function abrirEditorFoto({ nome, fotoUrl, enquadramento, onSave, onClose 
   };
   dialog.querySelectorAll("[data-previa]").forEach(pre => {
     pre.onpointerdown = ev => {
-      if (ajuste.modo !== "preencher" || salvando || !pronta || ev.button !== 0) return;
+      if (salvando || !pronta || ev.button !== 0) return;
       const rect = pre.getBoundingClientRect();
       const escala = Math.max(rect.width / fonte.naturalWidth, rect.height / fonte.naturalHeight) * ajuste.zoom;
       arraste = { id: ev.pointerId, px: ev.clientX, py: ev.clientY, x: ajuste.x, y: ajuste.y,
+        inteira: ajuste.modo === "inteira", frameW: rect.width, frameH: rect.height,
         largura: fonte.naturalWidth * escala - rect.width, altura: fonte.naturalHeight * escala - rect.height };
       pre.setPointerCapture(ev.pointerId);
     };
     pre.onpointermove = ev => {
       if (!arraste || arraste.id !== ev.pointerId || salvando) return;
+      const dx = ev.clientX - arraste.px, dy = ev.clientY - arraste.py;
       ajuste = normalizarEnquadramento({ ...ajuste,
-        x: arraste.largura > 1 ? arraste.x - (ev.clientX - arraste.px) / arraste.largura * 100 : ajuste.x,
-        y: arraste.altura > 1 ? arraste.y - (ev.clientY - arraste.py) / arraste.altura * 100 : ajuste.y });
+        x: arraste.inteira ? arraste.x + dx / arraste.frameW * 100
+          : arraste.largura > 1 ? arraste.x - dx / arraste.largura * 100 : ajuste.x,
+        y: arraste.inteira ? arraste.y + dy / arraste.frameH * 100
+          : arraste.altura > 1 ? arraste.y - dy / arraste.altura * 100 : ajuste.y });
       atualizar();
     };
     pre.onpointerup = pre.onpointercancel = pre.onlostpointercapture = () => { arraste = null; };

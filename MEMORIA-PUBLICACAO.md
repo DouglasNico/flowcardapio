@@ -1,6 +1,7 @@
 
 # Publicacao frontend — 23/09/2026
 
+
 Usuario autorizou publicar todos os sites. Publicar reconstrucao do painel e cardapio existentes (rotas legadas) e fontes V2 protegidas por opt-in. Nao habilitar VITE_V2_HOSPEDADO, nao implantar Functions/regras/indices nem criar loja remota nesta rodada. /gestao-v2 segue informando ambiente nao habilitado ate preparar backend. Build de producao executado; testes completos ficam para amanha. Segredos, fixtures e arquivos locais functions/.env nao entram no commit.
 
 ## 23/09/2026 — SVG restantes
@@ -49,3 +50,9 @@ Validação: `npm run build` aprovado (aviso existente de chunk >500KB). Nenhuma
 
 ## 23/09/2026 — Zoom também na foto inteira
 Pedido posterior do usuário libera zoom1–3× também em Foto inteira. `src/lib/foto.js` / `foto.css` preservam a ampliação da camada nítida, mantendo contain, centro fixo e fundo desfocado. Em1× não corta; acima disso a prévia mostra o recorte resultante. `src/pages/painel-foto.js` / `painel-foto.css`: zoom habilitado nos dois modos, posição permanece disponível no modo Preencher; alternar modos preserva cada ajuste durante a edição. Texto explica o efeito e Restaurar volta para1×. `tests/foto.test.js` atualizado: quatro testes aprovados. Fixture real com CSS do build em1366/390 confirmou zoom1,6×, blur, restaurar, alternar, salvar/reabrir e renderização pública sem errosJS/overflow. Build aprovado (aviso de tamanho anterior); evidência `cardapio-foto/zoom-results.json`. Sem upload nem gravação Firebase real; publicar catálogo continua explícito.
+
+## 23/09/2026 — Editor compacto, posição livre e Esc no produto
+- `src/pages/painel-foto.js` / `painel-foto.css`: título em uma linha “Ajustar foto - Nome”, nome longo truncado com reticências e conteúdo completo disponível no atributo title/acessibilidade. Removidos o título visual “Como mostrar a foto” (grupo mantém aria-label) e a nota inferior marcada pelo usuário. Prévia horizontal identificada como “No carrossel (Mais pedidos)”.
+- `src/lib/foto.js` / `foto.css` e editor: modo Foto inteira também aceita posição horizontal/vertical e arraste direto; a camada nítida move sobre o fundo desfocado fixo, inclusive com zoom1×. Metadados limitados a0–100%, preservados ao salvar/reabrir e trocar modos. Atualiza a restrição anterior de centro fixo. Arquivo original preservado.
+- `src/pages/cardapio.js` / `cardapio-design.css`: Esc fecha o modal do produto, inclusive com foco em observações; restaura foco no produto sem rolar e remove listener ao sair da página. Backdrop com blur2px apenas atrás do modal, mantendo produto nítido e a animação/opacidade anteriores.
+- Validação: quatro testes Node e build aprovados (aviso anterior de chunk>500KB). Fixtures1366/390 com CSS compilado verificaram nome longo/ellipsis, remoções, rótulo, sliders/arraste nos dois eixos, salvar/reabrir e blur; Esc exercitado duas vezes, foco em textarea, movimento normal/reduzido e scroll estável. Sem erros JavaScript/overflow nas verificações. Evidências em `cardapio-foto/posicao-titulo-results.json` e `esc-results.json`. Nenhuma gravação real Firebase ou upload de foto nos testes.
