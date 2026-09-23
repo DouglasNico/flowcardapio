@@ -52,6 +52,18 @@ export async function atualizarStatusPedido(chave, pedidoId, status) {
 }
 
 export function escutarPedidoPublico(pedidoId, onData, onError) {
+  if(pedidoId.startsWith('V2-')){
+    const token=new URLSearchParams(location.search).get('acompanhamento');
+    let stopped=false,executando=false,timer;
+    const tick=async()=>{if(stopped||executando||document.hidden)return;executando=true;try{
+      const r=await fetch('/api/acompanhar-integrado',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token}),signal:AbortSignal.timeout(15000)});
+      const p=await r.json();if(!r.ok)throw Error(p.error||'Não foi possível acompanhar o pedido.');
+      if(!stopped){onData(p);if(p.status==='cancelado'||(p.status==='entregue'&&p.pagamento==='pago')){stop();return;}}
+    }catch(e){if(!stopped)onError?.(e);}finally{executando=false;if(!stopped&&!document.hidden)timer=setTimeout(tick,30000);}};
+    const visible=()=>{clearTimeout(timer);if(!document.hidden)void tick();};
+    const stop=()=>{stopped=true;clearTimeout(timer);document.removeEventListener('visibilitychange',visible);};
+    document.addEventListener('visibilitychange',visible);void tick();return stop;
+  }
   return onSnapshot(
     doc(db, "cardapio_pedidos", pedidoId),
     (snap) => {

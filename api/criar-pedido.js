@@ -103,6 +103,8 @@ function respostaCliente(id, pedido) {
   return {id, ...publico};
 }
 
+import { encaminharPedidoV2 } from './_pedido-v2.js';
+
 export default async function handler(req, res) {
   if (preflight(req, res)) return;
   if (req.method !== "POST") return json(res, 405, { error: "Use POST." });
@@ -133,6 +135,8 @@ export default async function handler(req, res) {
     const publico = await getDocRest(`cardapio_publico/${chavePath}`, token);
     if (!publico) return json(res, 412, { error: "Cardápio ainda não publicado." });
     if (publico.pausado) return json(res, 412, { error: "Cardápio fechado no momento." });
+
+    if (publico.integracaoPdv) return json(res,200,await encaminharPedidoV2({chave,publico,body:{...req.body,tipo},idem,token}));
 
     const mapa = new Map((publico.produtos || []).map((p) => [String(p.id), p]));
     const itensIn = Array.isArray(req.body && req.body.itens) ? req.body.itens : [];

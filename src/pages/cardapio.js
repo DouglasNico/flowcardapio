@@ -420,7 +420,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       });
       salvarCarrinho(chave, mesa, []);
       sessionStorage.removeItem(`flowpdv_idem_${chave}_${mesa || "r"}`);
-      history.pushState({}, "", `/${chave}/pedido/${pedidoId}`);
+      history.pushState({}, "", `/${chave}/pedido/${pedidoId}` + (res.pedido?.acompanhamentoV2 ? `?acompanhamento=${encodeURIComponent(res.pedido.acompanhamentoV2)}` : ""));
       window.dispatchEvent(new Event("flowpdv:route"));
     } catch (err) {
       toast(erroAmigavel(err), 3200);
