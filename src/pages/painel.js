@@ -1,3 +1,4 @@
+import {centavosDoCampo, ligarCampoReais} from "../lib/moeda.js";
 import {compararCategorias} from "../lib/categorias.js";
 import {ligarBuscaCep} from "../lib/cep.js";
 import {telefoneFormatado, telefoneDigitos, enderecoEstruturado, enderecoTexto, validarEntrega} from "../../shared/entrega.js";
@@ -324,7 +325,7 @@ export async function renderPainel(app, sessao) {
           <h3>Entregas por bairro</h3>
           <label class="delivery-switch"><input type="checkbox" id="lj-delivery" ${entrega.ativo?'checked':''}> Receber pedidos para entrega</label>
           <p class="loja-help">Cadastre os bairros da sua cidade. A taxa é somada ao pedido do cliente. O repasse é uma referência interna por entrega para o motoboy, sem pagamento automático.</p>
-          <div id="delivery-bairros">${(entrega.bairros||[]).map(b=>`<div class="delivery-bairro" data-bairro-id="${esc(b.id)}"><label>Bairro<input data-bairro-nome value="${esc(b.nome)}" maxlength="80"></label><label>Taxa do cliente (R$)<input data-bairro-taxa type="number" min="0" max="10000" step="0.01" value="${(b.taxaCentavos||0)/100}"></label><label>Repasse motoboy (R$)<input data-bairro-repasse type="number" min="0" max="10000" step="0.01" value="${(b.repasseCentavos||0)/100}"></label><button type="button" class="btn-ghost" data-bairro-remover aria-label="Remover bairro">${ico.close}</button></div>`).join('')}</div>
+          <div id="delivery-bairros">${(entrega.bairros||[]).map(b=>`<div class="delivery-bairro" data-bairro-id="${esc(b.id)}"><label>Bairro<input data-bairro-nome value="${esc(b.nome)}" maxlength="80"></label><label>Taxa do cliente (R$)<input data-bairro-taxa type="text" inputmode="numeric" maxlength="18" placeholder="R$ 0,00" value="${esc(brl((b.taxaCentavos||0)/100))}"></label><label>Repasse motoboy (R$)<input data-bairro-repasse type="text" inputmode="numeric" maxlength="18" placeholder="R$ 0,00" value="${esc(brl((b.repasseCentavos||0)/100))}"></label><button type="button" class="btn-ghost" data-bairro-remover aria-label="Remover bairro">${ico.close}</button></div>`).join('')}</div>
           <button type="button" class="btn-ghost" id="lj-add-bairro">Adicionar bairro</button>
           <p class="loja-help">Taxa zero significa entrega grátis. Bairros não cadastrados não podem finalizar entrega. Pedidos de mesa e retirada não recebem essa taxa.</p>
         </div>
@@ -362,7 +363,7 @@ export async function renderPainel(app, sessao) {
 
     function contatoEntrega() {
       const enderecoDetalhado = enderecoEstruturado(Object.fromEntries([...main.querySelectorAll('[data-endereco]')].map(el=>[el.dataset.endereco,el.value])));
-      const bairros = [...main.querySelectorAll('[data-bairro-id]')].map(row=>({id:row.dataset.bairroId,nome:row.querySelector('[data-bairro-nome]').value,taxaCentavos:Math.round(Number(row.querySelector('[data-bairro-taxa]').value)*100),repasseCentavos:Math.round(Number(row.querySelector('[data-bairro-repasse]').value)*100)}));
+      const bairros = [...main.querySelectorAll('[data-bairro-id]')].map(row=>({id:row.dataset.bairroId,nome:row.querySelector('[data-bairro-nome]').value,taxaCentavos:centavosDoCampo(row.querySelector('[data-bairro-taxa]').value),repasseCentavos:centavosDoCampo(row.querySelector('[data-bairro-repasse]').value)}));
       return {whatsapp:telefoneDigitos(main.querySelector('#lj-wa').value),enderecoDetalhado,endereco:enderecoDetalhado.rua ? enderecoTexto(enderecoDetalhado) : cfg.endereco||enderecoTexto(enderecoDetalhado),delivery:{ativo:main.querySelector('#lj-delivery').checked,bairros}};
     }
     function salvarHorario() {
@@ -376,6 +377,7 @@ export async function renderPainel(app, sessao) {
     }
     main.querySelector("#pausado").addEventListener("change", salvarHorario);
     main.querySelector('#lj-wa').addEventListener('input',e=>{e.target.value=telefoneFormatado(e.target.value);});
+    main.querySelectorAll('[data-bairro-taxa], [data-bairro-repasse]').forEach(ligarCampoReais);
     main.querySelectorAll('#lj-wa, [data-endereco], #lj-abre, #lj-fecha, #lj-min-val, #lj-delivery, [data-bairro-id] input').forEach(el=>el.addEventListener('input',salvarHorario));
     limparCep = ligarBuscaCep({input:main.querySelector('[data-endereco="cep"]'),campos:Object.fromEntries(['rua','bairro','cidade','uf'].map(k=>[k,main.querySelector(`[data-endereco="${k}"]`)])),status:main.querySelector('#lj-cep-status'),aoPreencher:salvarHorario});
     main.querySelector('#lj-add-bairro').onclick=()=>{salvarHorario();lojaDraft.delivery.bairros.push({id:crypto.randomUUID(),nome:'',taxaCentavos:0,repasseCentavos:0});pintarLoja();main.querySelector('[data-bairro-id]:last-child input').focus();};
