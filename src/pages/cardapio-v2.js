@@ -968,10 +968,10 @@ export async function renderCardapioV2(app, atendimento = null) {
                 </h2>
                 <div class="v2-carousel-nav-header">
                   <button type="button" class="v2-carousel-arrow v2-carousel-arrow--prev is-hidden" id="v2-carousel-prev" aria-label="Rolar para a esquerda">
-                    ${ico.back}
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
                   </button>
                   <button type="button" class="v2-carousel-arrow v2-carousel-arrow--next" id="v2-carousel-next" aria-label="Rolar para a direita">
-                    <span style="display:inline-block; transform: rotate(180deg);">${ico.back}</span>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
                   </button>
                 </div>
               </div>
