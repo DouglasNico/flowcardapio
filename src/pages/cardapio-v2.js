@@ -966,11 +966,16 @@ export async function renderCardapioV2(app, atendimento = null) {
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                   Mais Pedidos
                 </h2>
+                <div class="v2-carousel-nav-header">
+                  <button type="button" class="v2-carousel-arrow v2-carousel-arrow--prev is-hidden" id="v2-carousel-prev" aria-label="Rolar para a esquerda">
+                    ${ico.back}
+                  </button>
+                  <button type="button" class="v2-carousel-arrow v2-carousel-arrow--next" id="v2-carousel-next" aria-label="Rolar para a direita">
+                    <span style="display:inline-block; transform: rotate(180deg);">${ico.back}</span>
+                  </button>
+                </div>
               </div>
               <div class="v2-carousel-outer">
-                <button type="button" class="v2-carousel-arrow v2-carousel-arrow--prev is-hidden" id="v2-carousel-prev" aria-label="Rolar para a esquerda">
-                  ${ico.back}
-                </button>
                 <div class="v2-bestsellers-carousel" id="v2-bestsellers-carousel">
                   ${maisPedidos.map(p => {
                     const preco = precoProduto(p);
@@ -995,9 +1000,6 @@ export async function renderCardapioV2(app, atendimento = null) {
                     `;
                   }).join('')}
                 </div>
-                <button type="button" class="v2-carousel-arrow v2-carousel-arrow--next" id="v2-carousel-next" aria-label="Rolar para a direita">
-                  <span style="display:inline-block; transform: rotate(180deg);">${ico.back}</span>
-                </button>
               </div>
             </section>
           ` : ''}

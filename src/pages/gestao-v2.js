@@ -22,77 +22,201 @@ export async function renderGestaoV2(app) {
     draftGuard?.dispose();
     const current = ++epoch, valid = () => !disposed && epoch === current;
     if (!valid()) return;
-    app.innerHTML = `<main class="gestao-v2"><header class="page-head"><div><h1>Gestão do cardápio</h1><p>${s.local ? 'Ambiente local de teste' : 'Ambiente hospedado'}</p></div>${user ? '<button class="btn-ghost" id="g-sair">Sair da conta</button>' : ''}</header><p id="g-status" role="status" aria-live="polite"></p><div id="g-content"></div></main>`;
+    app.innerHTML = `
+      <main class="gestao-v2">
+        <header class="g-topbar">
+          <div class="g-topbar-brand">
+            <img src="/logos/FlowPDV-horizontal-claro.png" alt="FlowPDV" class="g-topbar-logo">
+            <span class="g-topbar-badge">Gestão V2</span>
+          </div>
+          <div class="g-topbar-user">
+            ${user ? `
+              <div class="g-user-chip">
+                <span class="g-user-dot"></span>
+                <span>${esc(user.email)}</span>
+              </div>
+              <button type="button" class="btn-ghost g-btn-sair" id="g-sair">Sair</button>
+            ` : ''}
+          </div>
+        </header>
+        <p id="g-status" role="status" aria-live="polite"></p>
+        <div id="g-content"></div>
+      </main>
+    `;
     const content = app.querySelector('#g-content'), status = app.querySelector('#g-status');
     const say = (text, tone = 'info') => { if (valid()) { status.dataset.tone = tone; status.textContent = text; } };
     if (!user) {
-      content.innerHTML = '<form id="g-login" class="g-form"><h2>Acesso do gerente</h2><label>E-mail<input name="email" type="email" autocomplete="username" required></label><label>Senha<input name="password" type="password" autocomplete="current-password" required></label><button class="btn-primary">Entrar</button></form>';
-      const form = content.querySelector('form');
+      content.innerHTML = `
+        <div class="g-onboard-wrapper">
+          <form id="g-login" class="g-onboard-card">
+            <div class="g-onboard-header">
+              <img src="/logos/FlowPDV-horizontal-claro.png" alt="FlowPDV" style="height:36px; margin:0 auto 12px; display:block;">
+              <h2>Acesso da Gerência</h2>
+              <p>Entre com seu e-mail e senha para gerenciar pedidos e produtos em tempo real.</p>
+            </div>
+            <div class="g-field-group">
+              <label for="g-login-email">E-mail cadastrado</label>
+              <input id="g-login-email" name="email" type="email" autocomplete="username" placeholder="seu-email@exemplo.com" required>
+            </div>
+            <div class="g-field-group">
+              <label for="g-login-password">Senha de acesso</label>
+              <input id="g-login-password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn-primary g-btn-submit-store" style="margin-top:8px;">
+              <span>Entrar no Painel</span>
+              <span style="font-size:16px;">→</span>
+            </button>
+          </form>
+        </div>
+      `;
+      const form = content.querySelector('#g-login');
       form.onsubmit = async e => {
         e.preventDefault(); form.querySelector('button').disabled = true; say('Entrando…');
         try { await signInWithEmailAndPassword(s.auth, form.elements.email.value.trim(), form.elements.password.value); }
-        catch { say('Não foi possível entrar. Confira e-mail, senha e a conexão com o ambiente de teste.'); }
+        catch { say('Não foi possível entrar. Confira e-mail, senha e a conexão com o ambiente.'); }
         finally { if (valid()) form.querySelector('button').disabled = false; }
       };
       return;
     }
-    app.querySelector('#g-sair').onclick = async () => { try { await signOut(s.auth); } catch { say('Não foi possível sair. Tente novamente.'); } };
+    const btnSair = app.querySelector('#g-sair');
+    if (btnSair) {
+      btnSair.onclick = async () => { try { await signOut(s.auth); } catch { say('Não foi possível sair. Tente novamente.'); } };
+    }
     if (!user.emailVerified) { say('Confirme o e-mail da conta e entre novamente para acessar a gestão.'); return; }
     const salvoLoja = localStorage.getItem('flowpdv_gestao_loja_id') || '';
     content.innerHTML = `
-      <form id="g-store" class="g-form">
-        <h2>Abra sua loja</h2>
-        <label>Endereço ou identificador da loja
-          <input name="loja" required pattern="[A-Za-z0-9_-]{1,80}" maxlength="80" placeholder="Ex: burger-teste ou ID da loja" value="${esc(salvoLoja)}">
-        </label>
-        <button class="btn-primary">Abrir catálogo</button>
-        <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px;text-align:center;">
-          <p style="font-size:13px;color:var(--slate);margin-bottom:10px;">Ainda não tem loja cadastrada?</p>
-          <button type="button" class="btn-ghost" id="g-btn-nova-loja" style="width:100%;">+ Cadastrar Nova Loja</button>
-        </div>
-      </form>
-
-      <form id="g-create-store" class="g-form" hidden>
-        <h2>Cadastrar Nova Loja</h2>
-        <p style="font-size:13px;color:var(--slate);margin:0 0 16px;">Crie seu cardápio independente em segundos para operar 100% pelo celular.</p>
-        <label>Nome da loja / restaurante
-          <input name="nome" required maxlength="80" placeholder="Ex: Espetinho do Zé">
-        </label>
-        <label>Endereço do cardápio (Link)
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span style="font-size:12px;color:var(--slate);white-space:nowrap;">flowpdv.app.br/</span>
-            <input name="slug" required pattern="[a-z0-9-]{3,60}" maxlength="60" placeholder="espetinho-do-ze" style="text-transform:lowercase;">
+      <div class="g-onboard-wrapper">
+        <div id="g-store-card" class="g-onboard-card">
+          <div class="g-onboard-header">
+            <div class="g-onboard-icon">${ico.store}</div>
+            <h2>Painel do Lojista</h2>
+            <p>Selecione um estabelecimento para gerenciar ou comece uma nova operação online.</p>
           </div>
-          <small style="color:var(--slate);font-size:11px;">Apenas letras minúsculas, números e hífens.</small>
-        </label>
-        <div style="display:flex;gap:10px;margin-top:10px;">
-          <button type="submit" class="btn-primary" style="flex:1;">Criar Loja e Começar</button>
-          <button type="button" class="btn-ghost" id="g-btn-voltar-loja">Voltar</button>
-        </div>
-        <p class="g-result" role="status"></p>
-      </form>
 
-      <section id="g-catalog"></section>
+          <div id="g-minhas-lojas-box" class="g-minhas-lojas-box" hidden>
+            <div class="g-section-header">
+              <span class="g-section-label">Suas Lojas</span>
+              <span class="g-section-count" id="g-lojas-count"></span>
+            </div>
+            <div id="g-lojas-grid" class="g-lojas-grid"></div>
+          </div>
+
+          <form id="g-store" class="g-store-form">
+            <div class="g-field-group">
+              <label for="g-input-loja">Acessar Loja por Endereço ou ID</label>
+              <div class="g-input-wrap">
+                <span class="g-input-prefix">flowpdv.app.br/</span>
+                <input id="g-input-loja" name="loja" required pattern="[A-Za-z0-9_-]{1,80}" maxlength="80" placeholder="burger-teste" value="${esc(salvoLoja)}">
+              </div>
+              <div class="g-quick-suggestions">
+                <span class="g-quick-label">Atalhos rápidos:</span>
+                <button type="button" class="g-chip-btn" data-fill-loja="burger-teste">🍔 burger-teste</button>
+              </div>
+            </div>
+            <button type="submit" class="btn-primary g-btn-submit-store" style="margin-top:10px;">
+              <span>Abrir Painel da Loja</span>
+              <span style="font-size:16px;">→</span>
+            </button>
+          </form>
+
+          <div class="g-onboard-divider">
+            <span>ou</span>
+          </div>
+
+          <div class="g-new-store-cta">
+            <div class="g-new-store-cta-info">
+              <strong>+ Cadastrar Nova Loja Independente</strong>
+              <p>Crie seu cardápio em segundos para gerenciar pelo celular sem PDV desktop.</p>
+            </div>
+            <button type="button" class="btn-outline" id="g-btn-nova-loja">Criar Loja</button>
+          </div>
+        </div>
+
+        <form id="g-create-store" class="g-onboard-card" hidden>
+          <div class="g-onboard-header">
+            <div class="g-onboard-icon" style="background:#ffedd5; color:#c2410c;">${ico.store}</div>
+            <h2>Cadastrar Nova Loja</h2>
+            <p>Seu cardápio estará no ar imediatamente para receber pedidos no WhatsApp e celular.</p>
+          </div>
+
+          <div class="g-field-group">
+            <label for="g-create-nome">Nome do Estabelecimento *</label>
+            <input id="g-create-nome" name="nome" required maxlength="80" placeholder="Ex: Hamburgueria Artesanal">
+          </div>
+
+          <div class="g-field-group">
+            <label for="g-create-slug">Endereço Público do Cardápio *</label>
+            <div class="g-input-wrap">
+              <span class="g-input-prefix">flowpdv.app.br/</span>
+              <input id="g-create-slug" name="slug" required pattern="[a-z0-9-]{3,60}" maxlength="60" placeholder="hamburgueria-artesanal" style="text-transform:lowercase;">
+            </div>
+            <small class="g-field-hint">Este será o link oficial do cardápio para seus clientes.</small>
+          </div>
+
+          <div class="g-create-actions">
+            <button type="submit" class="btn-primary g-btn-create-submit">Criar Loja e Começar</button>
+            <button type="button" class="btn-ghost" id="g-btn-voltar-loja">Voltar</button>
+          </div>
+          <p class="g-result" role="status"></p>
+        </form>
+
+        <section id="g-catalog"></section>
+      </div>
     `;
-    const storeForm = content.querySelector('#g-store'), createForm = content.querySelector('#g-create-store'), catalog = content.querySelector('#g-catalog');
+    const storeCard = content.querySelector('#g-store-card'), storeForm = content.querySelector('#g-store'), createForm = content.querySelector('#g-create-store'), catalog = content.querySelector('#g-catalog');
     const btnNovaLoja = content.querySelector('#g-btn-nova-loja'), btnVoltarLoja = content.querySelector('#g-btn-voltar-loja'), createResult = createForm.querySelector('.g-result');
     let data, lojaId, uncertain = false, busy = false, activeTab = 'catalogo', lojaDraft = null, productDraft = null, deliveryDraft = null, mesaDraft = null, addonDraft = null, contatoDraft = null;
     draftGuard = protegerRascunhosGestao(content, () => busy);
-    app.querySelector('#g-sair').onclick = async () => {
-      if (busy) { say('Aguarde a operação terminar antes de sair.', 'info'); return; }
-      if (draftGuard.pending() && !window.confirm('Há alterações não salvas. Deseja descartá-las e sair da conta?')) return;
-      try { await signOut(s.auth); } catch { say('Não foi possível sair. Tente novamente.', 'error'); }
-    };
+
+    // Carrega lojas já vinculadas ao usuário
+    (async () => {
+      try {
+        const res = await s.call('listarMinhasLojasV2', {});
+        const lojas = res?.lojas || [];
+        const box = content.querySelector('#g-minhas-lojas-box');
+        const grid = content.querySelector('#g-lojas-grid');
+        const count = content.querySelector('#g-lojas-count');
+        if (box && grid && lojas.length > 0) {
+          box.hidden = false;
+          if (count) count.textContent = `${lojas.length} cadastrada${lojas.length > 1 ? 's' : ''}`;
+          grid.innerHTML = lojas.map(l => `
+            <button type="button" class="g-loja-card" data-loja-slug="${esc(l.slug || l.lojaId)}">
+              <div class="g-loja-card-icon">${ico.store}</div>
+              <div class="g-loja-card-info">
+                <strong>${esc(l.nome)}</strong>
+                <small>flowpdv.app.br/${esc(l.slug)}</small>
+              </div>
+              <span class="g-loja-card-arrow">Abrir →</span>
+            </button>
+          `).join('');
+          grid.querySelectorAll('.g-loja-card').forEach(btn => {
+            btn.onclick = () => {
+              storeForm.elements.loja.value = btn.dataset.lojaSlug;
+              storeForm.dispatchEvent(new Event('submit'));
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar lojas do gerente:', err);
+      }
+    })();
+
+    content.querySelectorAll('[data-fill-loja]').forEach(btn => {
+      btn.onclick = () => {
+        storeForm.elements.loja.value = btn.dataset.fillLoja;
+        storeForm.dispatchEvent(new Event('submit'));
+      };
+    });
 
     btnNovaLoja.onclick = () => {
-      storeForm.hidden = true;
+      storeCard.hidden = true;
       createForm.hidden = false;
       createForm.elements.nome.focus();
     };
 
     btnVoltarLoja.onclick = () => {
       createForm.hidden = true;
-      storeForm.hidden = false;
+      storeCard.hidden = false;
     };
 
     createForm.elements.nome.oninput = () => {
@@ -156,6 +280,9 @@ export async function renderGestaoV2(app) {
       try {
         await load();
         if (valid()) {
+          const wrapper = content.querySelector('.g-onboard-wrapper');
+          if (wrapper) wrapper.hidden = true;
+          if (storeCard) storeCard.hidden = true;
           storeForm.hidden = true;
           localStorage.setItem('flowpdv_gestao_loja_id', data.slug || lojaId);
           say('Catálogo carregado.', 'success');
@@ -172,6 +299,10 @@ export async function renderGestaoV2(app) {
       }, 50);
     }
     function draw() {
+      const topbar = app.querySelector('.g-topbar');
+      if (topbar) topbar.hidden = true;
+      const wrapper = content.querySelector('.g-onboard-wrapper');
+      if (wrapper) wrapper.hidden = true;
       let sidebar = app.querySelector('.g-sidebar');
       if (!sidebar) {
         const main = app.querySelector('main.gestao-v2'), shell = document.createElement('div'); shell.className = 'g-shell';
