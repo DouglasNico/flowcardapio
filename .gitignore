@@ -3,6 +3,15 @@ dist
 .env
 .env.*
 !.env.example
+!.env.production
 *.log
 .DS_Store
 .vite
+
+.vercel
+.env*
+.impeccable/
+fotos-teste/
+cardapio-lanchonete-teste.*
+teste.pdf
+functions/

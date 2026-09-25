@@ -1,10 +1,11 @@
+import { precoOferta, temPromocao, comporCombo, centavos } from "../../shared/ofertas.js";
 import {compararCategorias} from "../lib/categorias.js";
 import {telefoneFormatado, calcularEntrega} from "../../shared/entrega.js";
 import { acompanharCategorias } from "../lib/categorias-scroll.js";
 import "./cardapio-design.css";
 import "../lib/foto.css";
 import { htmlFoto, normalizarEnquadramento } from "../lib/foto.js";
-import { criarPedido, lerCardapioPublico } from "../lib/pedidos.js";
+import { criarPedido, lerCardapioPublico, invalidarCardapioPublico } from "../lib/pedidos.js";
 import { brl, erroAmigavel, esc, linkWhatsapp, toast } from "../lib/format.js";
 import { ico } from "../lib/icons.js";
 import { guardarPedidoLocal } from "../lib/pedido-ui.js";
@@ -35,6 +36,9 @@ function lerCarrinho(chave, mesa) {
     return arr.map((i) => ({
       linhaId: i.linhaId || (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()),
       id: i.id,
+      variante: i.variante || 'individual', bebidaId: i.bebidaId || '',
+      precoEsperadoCentavos: i.precoEsperadoCentavos,
+      comboDetalhe: i.comboDetalhe || '',
       nome: i.nome,
       preco: Number(i.preco) || 0,
       quantidade: Math.max(1, Number(i.quantidade) || 1),
@@ -64,7 +68,32 @@ function iniciais(nome) {
 
 export async function renderCardapio(app, { chave, mesa, itemId }) {
   document.body.className = "is-menu";
-  app.innerHTML = `<div class="menu-frame"><p class="empty">Carregando cardápio...</p></div>`;
+  app.innerHTML = `
+    <div class="menu-frame" aria-busy="true" aria-label="Carregando cardápio">
+      <header class="menu-header" style="border-bottom: 1px solid #e7ded3; padding-bottom: 18px; margin-bottom: 20px;">
+        <div class="skeleton-shimmer" style="width: 140px; height: 32px; border-radius: 8px; margin-bottom: 12px;"></div>
+        <div class="skeleton-shimmer" style="width: 220px; height: 16px; border-radius: 4px; margin-bottom: 16px;"></div>
+        <div style="display: flex; gap: 8px;">
+          <div class="skeleton-shimmer" style="width: 72px; height: 28px; border-radius: 20px;"></div>
+          <div class="skeleton-shimmer" style="width: 72px; height: 28px; border-radius: 20px;"></div>
+          <div class="skeleton-shimmer" style="width: 72px; height: 28px; border-radius: 20px;"></div>
+        </div>
+      </header>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+        ${[1, 2, 3, 4, 5, 6].map(() => `
+          <div style="display: flex; gap: 12px; padding: 14px; border: 1px solid #ebd9c8; border-radius: 12px; background: #fff;">
+            <div style="flex: 1;">
+              <div class="skeleton-shimmer" style="width: 70%; height: 18px; border-radius: 4px; margin-bottom: 8px;"></div>
+              <div class="skeleton-shimmer" style="width: 90%; height: 12px; border-radius: 4px; margin-bottom: 6px;"></div>
+              <div class="skeleton-shimmer" style="width: 50%; height: 12px; border-radius: 4px; margin-bottom: 14px;"></div>
+              <div class="skeleton-shimmer" style="width: 65px; height: 18px; border-radius: 4px;"></div>
+            </div>
+            <div class="skeleton-shimmer" style="width: 88px; height: 88px; border-radius: 10px; flex-shrink: 0;"></div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
   let publico;
   try {
     publico = await lerCardapioPublico(chave);
@@ -76,7 +105,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   document.title = (publico && publico.nome) ? `${publico.nome} · Cardápio` : "Cardápio · FlowPDV";
 
   const todos = (publico && publico.produtos) || [];
-  const produtos = todos.filter((p) => !p.esgotado);
+  let produtos = todos.filter((p) => !p.esgotado);
   let itemAtual = itemId ? String(itemId) : null;
   let busca = "";
   let buscaAberta = false;
@@ -159,6 +188,8 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const overlay = overlayEl();
     if (!overlay || !itemUi) return;
     const { grupos, tot, pode, precisa, foco } = itemUi;
+    const precoEl = overlay.querySelector('.prod-from');
+    if (precoEl && prodAtual()) precoEl.innerHTML = htmlPreco(prodAtual());
     const body = overlay.querySelector(".prod-body");
     const y = body ? body.scrollTop : 0;
     overlay.querySelectorAll(".opt-group[data-g]").forEach((sec) => {
@@ -215,7 +246,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   );
 
   function novoRascunho() {
-    return { qtd: 1, obs: "", extras: [], ativos: {} };
+    return { qtd: 1, obs: '', extras: [], ativos: {}, variante:'individual', bebidaId:'' };
   }
 
   function pathLista() {
@@ -230,10 +261,16 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     return todos.find((p) => String(p.id) === String(itemAtual)) || null;
   }
 
+  function totalLinhaCarrinho(i) {
+    const p = produtos.find(x => String(x.id) === String(i.id));
+    try { if (p) return precoLinha(p, i.extras, i.quantidade, i.variante); } catch { /* O item indisponível continua removível. */ }
+    return (Number.isInteger(i.precoEsperadoCentavos) ? i.precoEsperadoCentavos / 100 : Number(i.preco) || 0) * i.quantidade;
+  }
+
   function totalCarrinho() {
     return carrinho.reduce((s, i) => {
       const p = produtos.find((x) => String(x.id) === String(i.id));
-      return s + (p ? precoLinha(p, i.extras, i.quantidade) : (Number(i.preco) || 0) * i.quantidade);
+      return s + totalLinhaCarrinho(i);
     }, 0);
   }
 
@@ -251,7 +288,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   }
 
   function abrirItem(id, origem = null, teclado = false) {
-    retornoItem = origem ? { teclado, tipo: origem.classList.contains("spot-card") ? ".spot-card" : ".menu-item" } : null;
+    retornoItem = origem ? { teclado, secao: origem.closest("section")?.id, tipo: origem.classList.contains("spot-card") ? ".spot-card" : ".menu-item" } : null;
     itemAtual = String(id);
     rascunho = novoRascunho();
     buscaExtra = "";
@@ -283,7 +320,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       pintarLista();
       // Restore keyboard navigation to the same occurrence, without marking mouse-opened cards.
       if (retorno?.teclado) {
-        [...app.querySelectorAll(retorno.tipo)].find(el => el.dataset.open === idFechado)?.focus({ preventScroll: true });
+        [...app.querySelectorAll(retorno.tipo)].find(el => el.dataset.open === idFechado && (!retorno.secao || el.closest('section')?.id === retorno.secao))?.focus({ preventScroll: true });
       }
       retornoItem = null;
     };
@@ -347,6 +384,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     if (!prod || prod.esgotado) return;
     try {
       validarExtras(prod, rascunho.extras);
+      if (rascunho.variante === 'combo') comporCombo(prod, rascunho.bebidaId);
     } catch (err) {
       toast(err.message || "Complete as opções do item.");
       return;
@@ -355,7 +393,10 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       linhaId: (crypto.randomUUID && crypto.randomUUID()) || `${Date.now()}`,
       id: prod.id,
       nome: prod.nome,
-      preco: Number(prod.preco) || 0,
+      preco: precoOferta(prod, rascunho.variante).preco,
+      variante: rascunho.variante, bebidaId: rascunho.bebidaId,
+      precoEsperadoCentavos: centavos(precoLinha(prod, rascunho.extras, 1, rascunho.variante)),
+      comboDetalhe: rascunho.variante === 'combo' ? comporCombo(prod, rascunho.bebidaId).slice(1).map(c => `${c.quantidade}× ${c.nome} (incluso)`).join(', ') : '',
       quantidade: Math.max(1, rascunho.qtd),
       observacao: String(rascunho.obs || "").slice(0, 180),
       extras: rascunho.extras,
@@ -372,6 +413,27 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const idem = sessionStorage.getItem(`flowpdv_idem_${chave}_${mesa || "r"}`) || crypto.randomUUID();
     sessionStorage.setItem(`flowpdv_idem_${chave}_${mesa || "r"}`, idem);
     try {
+      invalidarCardapioPublico();
+      publico = await lerCardapioPublico(chave);
+      if (!publico || publico.pausado) throw new Error('O cardápio não está recebendo pedidos.');
+      produtos = (publico.produtos || []).filter(p => !p.esgotado);
+      agendarPromocao();
+      let mudou = false;
+      const cotacoes = [];
+      for (const linha of carrinho) {
+        const atual = produtos.find(p => String(p.id) === String(linha.id));
+        if (!atual) throw new Error(`${linha.nome} não está mais disponível. Remova o item do pedido.`);
+        validarExtras(atual, linha.extras);
+        if (linha.variante === 'combo') comporCombo(atual, linha.bebidaId);
+        const esperado = centavos(precoLinha(atual, linha.extras, 1, linha.variante));
+        if (linha.precoEsperadoCentavos !== esperado) mudou = true;
+        cotacoes.push(esperado);
+      }
+      if (mudou) {
+        carrinho.forEach((linha, index) => { linha.precoEsperadoCentavos = cotacoes[index]; });
+        salvarCarrinho(chave, mesa, carrinho); pintar();
+        throw new Error('Os preços foram atualizados. Confira o total e confirme o pedido novamente.');
+      }
       if (modoPedido === 'delivery') calcularEntrega(publico.delivery, dadosEntrega);
       const res = await criarPedido({
         chave,
@@ -381,6 +443,8 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
         entrega: modoPedido === "delivery" ? dadosEntrega : undefined,
         itens: carrinho.map((i) => ({
           id: i.id,
+          variante: i.variante || 'individual', bebidaId: i.bebidaId || '',
+          precoEsperadoCentavos: i.precoEsperadoCentavos,
           quantidade: i.quantidade,
           observacao: i.observacao || "",
           extras: (i.extras || []).map((e) => ({
@@ -494,6 +558,12 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     return;
   }
 
+  function htmlPreco(p) {
+    const oferta = precoOferta(p);
+    const comboPromo = p.combo?.ativo && precoOferta(p, 'combo').promocao;
+    return `${oferta.promocao ? `<s class="preco-anterior">${brl(oferta.normal)}</s> ` : ''}${esc(rotuloPreco(p))}${comboPromo ? `<span class="combo-preco-promo">Combo: <s>${brl(p.combo.preco)}</s> ${brl(precoOferta(p, 'combo').preco)}</span>` : ''}`;
+  }
+
   function cardProduto(p, destaque, todosDestaque) {
     const foto = p.fotoUrl
       ? htmlFoto(p)
@@ -502,20 +572,25 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       return `
         <article class="spot-card" data-open="${esc(p.id)}" role="button" tabindex="0">
           <div class="spot-media">${foto}
-            </div><span class="spot-cap"><b>${esc(p.nome)}</b><small>${esc(rotuloPreco(p))}</small></span>
+            </div><span class="spot-cap"><b>${esc(p.nome)}</b><small>${htmlPreco(p)}</small></span>
         </article>`;
     }
     return `
       <article class="menu-item" data-open="${esc(p.id)}" role="button" tabindex="0">
         <div class="menu-media">${foto}<span class="add-dot">${ico.plus}</span></div>
         <div class="menu-copy${p.descricao ? "" : " short"}">
-          ${p.destaque && !todosDestaque ? `<em class="fav">Mais pedido</em>` : ""}
+          ${temPromocao(p) ? `<em class="fav">Promoção</em>` : p.destaque && !todosDestaque ? `<em class="fav">Mais pedido</em>` : ""}
           <h3>${esc(p.nome)}</h3>
           ${p.descricao ? `<p>${esc(p.descricao)}</p>` : ""}
-          <strong>${esc(rotuloPreco(p))}</strong>
+          <strong>${htmlPreco(p)}</strong>
         </div>
       </article>
     `;
+  }
+
+  function htmlCarrossel(itens, id, titulo, descricao, todosDestaque) {
+    if (!itens.length) return '';
+    return `<section class="spot-wrap" id="${id}"><div class="spot-heading"><div><h2 id="${id}-title">${titulo}</h2><p>${descricao}</p></div><div class="spot-controls"><span data-spot-position aria-live="polite"></span><button type="button" class="icon-btn" data-spot-prev aria-label="${titulo}: anteriores" aria-controls="${id}-carousel">${ico.back}</button><button type="button" class="icon-btn" data-spot-next aria-label="${titulo}: próximos" aria-controls="${id}-carousel">${ico.back}</button></div></div><div class="spot-row" id="${id}-carousel" role="region" aria-roledescription="carrossel" aria-labelledby="${id}-title" tabindex="0">${itens.map(p => cardProduto(p,true,todosDestaque)).join('')}</div></section>`;
   }
 
   function pintarLista() {
@@ -523,12 +598,14 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const lista = q
       ? produtos.filter((p) => `${p.nome} ${p.descricao || ""} ${p.categoria || ""}`.toLowerCase().includes(q))
       : produtos;
+    const promocoes = q ? [] : produtos.filter(p => temPromocao(p));
     const destaquesAll = produtos.filter((p) => p.destaque);
     const todosDestaque = produtos.length > 0 && destaquesAll.length >= produtos.length;
     const destaques = (!q && !todosDestaque) ? destaquesAll.slice(0, 8) : [];
     const cats = q ? [] : [...new Set(lista.map((p) => p.categoria || "Geral"))].sort(compararCategorias);
     const idMais = "cat-mais-pedidos";
     const abas = [
+      ...(promocoes.length ? [['Promoções', 'cat-promocoes']] : []),
       ...(destaques.length ? [["Mais pedidos", idMais]] : []),
       ...cats.map((c) => [c, idCategoria(c)])
     ];
@@ -549,11 +626,8 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       <div class="menu-frame">
         <div class="menu-page ${nItens() ? "has-cart" : ""}">
           ${topoLoja(extraTopo)}
-          ${destaques.length ? `
-            <section class="spot-wrap" id="${idMais}">
-              <div class="spot-heading"><div><h2 id="spot-title">Mais pedidos</h2><p>Explore os destaques da loja.</p></div><div class="spot-controls"><span id="spot-position" aria-live="polite"></span><button type="button" class="icon-btn" data-spot-prev aria-label="Destaques anteriores" aria-controls="spot-carousel">${ico.back}</button><button type="button" class="icon-btn" data-spot-next aria-label="Próximos destaques" aria-controls="spot-carousel">${ico.back}</button></div></div>
-              <div class="spot-row" id="spot-carousel" role="region" aria-roledescription="carrossel" aria-labelledby="spot-title" tabindex="0">${destaques.map((p) => cardProduto(p, true, todosDestaque)).join("")}</div>
-            </section>` : ""}
+          ${htmlCarrossel(promocoes, 'cat-promocoes', 'Promoções', 'Preços especiais da loja.', todosDestaque)}
+          ${htmlCarrossel(destaques, idMais, 'Mais pedidos', 'Explore os destaques da loja.', todosDestaque)}
           <div class="menu-list">
             ${q ? `
               <h2 class="sec-title">${lista.length ? "Resultados" : "Nada encontrado"}</h2>
@@ -597,7 +671,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
 
   function htmlCartItem(i, editar) {
     const p = produtos.find((x) => String(x.id) === String(i.id));
-    const tot = p ? precoLinha(p, i.extras, i.quantidade) : (i.preco * i.quantidade);
+    const tot = totalLinhaCarrinho(i);
     const foto = (p && p.fotoUrl) || i.fotoUrl;
     const extras = linhasExtra(p, i.extras);
     return `
@@ -610,6 +684,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
             <strong>${esc(i.quantidade)}× ${esc(i.nome)}</strong>
             <b>${brl(tot)}</b>
           </div>
+          ${i.variante === 'combo' ? `<p class="cart-obs"><b>Combo</b> · ${esc(i.comboDetalhe)}</p>` : ''}
           ${extras.length ? `
             <ul class="cart-extras">
               ${extras.map((e) => `<li>${e.grupo ? `<em>${esc(e.grupo)}</em>` : ""}<span>${esc(e.nome)}</span></li>`).join("")}
@@ -674,7 +749,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       return;
     }
     const grupos = sanitizarGrupos(prod.grupos);
-    let tot = precoLinha(prod, rascunho.extras, rascunho.qtd);
+    let tot = precoLinha(prod, rascunho.extras, rascunho.qtd, rascunho.variante);
     for (const g of grupos) {
       const ligado = g.min > 0 || Boolean(rascunho.ativos[g.id]);
       if (!ligado || !g.precoGrupo) continue;
@@ -685,7 +760,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     const pendente = grupos.find((g) => qtdNoGrupo(rascunho.extras, g.id) < precisa(g));
     let pode = true;
     let motivo = "";
-    try { validarExtras(prod, rascunho.extras); }
+    try { validarExtras(prod, rascunho.extras); if(rascunho.variante === 'combo') comporCombo(prod, rascunho.bebidaId); }
     catch (err) { pode = false; motivo = err.message; }
     if (pode && pendente) {
       pode = false;
@@ -720,7 +795,13 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
               <h1>${esc(prod.nome)}</h1>
             <p class="prod-cat">${esc(prod.categoria || "")}</p>
               ${prod.descricao ? `<p class="prod-desc">${esc(prod.descricao)}</p>` : ""}
-              <p class="prod-from">${mostraAPartirDe(prod) ? "A partir de " : ""}${brl(precoMinimo(prod))}</p>
+              <p class="prod-from">${htmlPreco(prod)}</p>
+              ${prod.combo?.ativo ? `<fieldset class="combo-escolha"><legend>Como você prefere?</legend>
+                <label><input type="radio" name="variante" value="individual" ${rascunho.variante === 'individual' ? 'checked' : ''}> Só o produto <strong>${brl(precoOferta(prod).preco)}</strong></label>
+                <label><input type="radio" name="variante" value="combo" ${rascunho.variante === 'combo' ? 'checked' : ''}> Combo <strong>${brl(precoOferta(prod, 'combo').preco)}</strong></label>
+                <p>Inclui ${[...prod.combo.fixos.map(c=>`${c.quantidade}× ${c.nome}`), '1 bebida à sua escolha'].map(esc).join(' + ')}.</p>
+                ${rascunho.variante === 'combo' ? `<label class="combo-bebida">Escolha a bebida incluída<select id="combo-bebida"><option value="">Selecione a bebida</option>${prod.combo.bebidas.map(b=>`<option value="${esc(b.produtoId)}" ${String(b.produtoId) === String(rascunho.bebidaId) ? 'selected' : ''}>${esc(b.nome)} — inclusa</option>`).join('')}</select></label>` : ''}
+              </fieldset>` : ''}
               ${grupos.length ? grupos.map((g) => {
                 const opcional = g.min <= 0;
                 const ativo = !opcional || Boolean(rascunho.ativos[g.id]);
@@ -803,6 +884,14 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       });
     }
 
+    overlay.querySelectorAll('[name="variante"]').forEach(input => input.onchange = () => {
+      rascunho.variante = input.value;
+      overlay.dataset.item = '';
+      pintarProduto();
+      overlay.querySelector(`[name="variante"][value="${rascunho.variante}"]`)?.focus({preventScroll:true});
+    });
+    const bebidaSelect = overlay.querySelector('#combo-bebida');
+    if (bebidaSelect) bebidaSelect.onchange = () => {rascunho.bebidaId = bebidaSelect.value; pintarProduto();};
     overlay.querySelector("#btn-voltar").addEventListener("click", fecharItem);
     overlay.querySelector("#qtd-menos").addEventListener("click", () => {
       rascunho.qtd = Math.max(1, rascunho.qtd - 1);
@@ -900,9 +989,10 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
 
   function ligarCarrossel() {
     limparCarrossel();
-    const row = app.querySelector('.spot-row');
-    if (!row) return;
-    const prev = app.querySelector('[data-spot-prev]'), next = app.querySelector('[data-spot-next]');
+    const limpezas = [];
+    app.querySelectorAll('.spot-wrap').forEach(wrap => {
+    const row = wrap.querySelector('.spot-row');
+    const prev = wrap.querySelector('[data-spot-prev]'), next = wrap.querySelector('[data-spot-next]');
     const cards = [...row.querySelectorAll('.spot-card')];
     const medidas = () => {
       const css = getComputedStyle(row), gap = parseFloat(css.columnGap) || 0;
@@ -915,7 +1005,7 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
       const inicio = Math.min(cards.length, Math.round(row.scrollLeft / passo) + 1);
       prev.disabled = row.scrollLeft <= 2;
       next.disabled = row.scrollLeft + row.clientWidth >= row.scrollWidth - 2;
-      app.querySelector('#spot-position').textContent = `${inicio}–${Math.min(cards.length,inicio+visiveis-1)} de ${cards.length}`;
+      wrap.querySelector('[data-spot-position]').textContent = `${inicio}–${Math.min(cards.length,inicio+visiveis-1)} de ${cards.length}`;
     };
     const mover = direcao => {const {passo,visiveis}=medidas();row.scrollBy({left:direcao*passo*visiveis,behavior:reduzMovimento()?'instant':'smooth'});};
     prev.onclick = () => mover(-1);
@@ -925,7 +1015,9 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     row.addEventListener('keydown',teclado);
     const observer = new ResizeObserver(atualizar); observer.observe(row);
     atualizar();
-    limparCarrossel = () => {observer.disconnect();row.removeEventListener('scroll',atualizar);row.removeEventListener('keydown',teclado);};
+    limpezas.push(() => {observer.disconnect();row.removeEventListener('scroll',atualizar);row.removeEventListener('keydown',teclado);});
+    });
+    limparCarrossel = () => limpezas.forEach(limpar => limpar());
   }
 
   function bindLista() {
@@ -1037,7 +1129,14 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
     pintarLista();
   }
 
-  pintar();
+  let timerPromocao;
+  function agendarPromocao() {
+    clearTimeout(timerPromocao);
+    const agora = Date.now();
+    const datas = produtos.flatMap(p => [p.promocao?.inicio,p.promocao?.fim]).filter(Boolean).map(Date.parse).filter(n=>n>agora);
+    if (datas.length) timerPromocao = setTimeout(() => {pintar();agendarPromocao();}, Math.min(2147483647,Math.max(1,Math.min(...datas)-agora+30)));
+  }
+  pintar(); agendarPromocao();
   function fecharComEscape(ev) {
     if (ev.key !== "Escape" || ev.defaultPrevented || ev.isComposing || !itemAtual) return;
     ev.preventDefault();
@@ -1045,5 +1144,5 @@ export async function renderCardapio(app, { chave, mesa, itemId }) {
   }
   window.addEventListener("keydown", fecharComEscape);
   window.addEventListener('scroll', acompanharBusca, {passive:true});
-  return () => { window.removeEventListener("keydown", fecharComEscape); window.removeEventListener('scroll', acompanharBusca); limparCarrossel(); limparCategorias(); overlayEl()?.remove(); travarFundo(false); };
+  return () => { clearTimeout(timerPromocao); window.removeEventListener("keydown", fecharComEscape); window.removeEventListener('scroll', acompanharBusca); limparCarrossel(); limparCategorias(); overlayEl()?.remove(); travarFundo(false); };
 }

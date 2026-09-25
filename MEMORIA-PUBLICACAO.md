@@ -59,3 +59,19 @@ Pedido posterior do usuário libera zoom1–3× também em Foto inteira. `src/li
 
 ## 23/09/2026 — Foco correto após Esc
 `src/pages/cardapio.js`: registra se o produto foi aberto por mouse/toque ou teclado e a origem na lista/carrossel. Ao fechar, abertura por ponteiro não força foco visual num cartão; teclado retorna à mesma ocorrência do produto, evitando selecionar a cópia no carrossel. Não desabilita focus-visible global. Fixture1366/390 verificou quatro produtos/origens por clique sem contorno residual, scroll estável e retorno por Enter/Esc na lista e carrossel. Sem errosJS; build aprovado (aviso anterior de chunk>500KB). Evidência `cardapio-foto/foco-esc-results.json`.
+
+## 23/09/2026 — Combos e promoções: implementação local, NÃO publicada
+- `shared/ofertas.js`, `src/lib/overlay.js` e `src/lib/grupos.js`: contrato de preços/composição, publicação explícita, bebida inclusa e preços promocionais independentes.
+- `src/pages/painel.js`, `painel-grupos.js` e `painel-catalogo.css`: ativação e período de promoção; preços somente do PDV. Salvar grupos passa a manter rascunho até Publicar cardápio.
+- `src/pages/cardapio.js` e `cardapio-design.css`: Promoções antes de Mais pedidos, escolha individual/combo, bebida inclusa, preços consistentes e reconfirmação após mudança. Temporizador local para validade.
+- `api/criar-pedido.js` e `src/lib/pedidos.js`: validação autoritativa em centavos, permissão atual para combos, composição histórica e código de erro. Não implementa baixa de estoque.
+- Verificação: 17 testes Node aprovados (ofertas, publicação, entrega e foto); build aprovado com aviso de chunk preexistente. Fixtures PC/celular, 1366/390, sem erros JS, incluindo reconfirmação de preço. Serviços simulados, sem gravação Firebase real. PDV: 1 teste compartilhado e bundle aprovados.
+- Consumo previsto pelo código: uma releitura do catálogo por confirmação e uma leitura adicional da licença na API para pedido com combo. Não é medição de cobrança; nenhum serviço V2 ativado.
+- Pendente: integração do pedido público ao recebimento/venda/estoque/estorno no PDV. Registro completo em `flowpdv-sistema/adega-pdv-gestao/docs/COMBOS-PROMOCOES-ETAPA-CATALOGO-20260923.md`. Sem commit/push/deploy nesta etapa; domínio novo não configurado.
+
+## 23/09/2026 — Continuação pelo V2 local: combo e estoque
+Escolha explícita do usuário: validar no V2 local. `src/pages/cardapio-v2.js` e `cardapio-v2.css` agora mostram preço promocional, individual/combo, bebida obrigatória inclusa e resumo do combo. O carrinho envia variante, bebida e preço conferido; uma releitura antes da confirmação/cotação exige nova confirmação quando o preço muda. Recuperação de envio pendente mantém o conteúdo original.
+
+Backend correspondente no PDV: recebimento valida composição, fechamento consome componentes pelas fichas e estorno usa consumos históricos; cozinha/cupom preservam inclusos. 57 testes de fechamento, 13 de pedidos públicos e 11 testes Node aprovados; build e bundle aprovados. Fixtures PC/celular 1366/390 com fonte real e serviços simulados passaram sem erros JS/overflow. Evidências em `flowpdv-sistema/output/reconstrucao-web-20260923/combos-v2`.
+
+Sem publicação. O cardápio atual continua usando pedidos antigos; não há ponte automática para V2 nem migração de estoque/catálogo real. Registro: `flowpdv-sistema/adega-pdv-gestao/docs/COMBOS-PROMOCOES-INTEGRACAO-V2-20260923.md`. Domínio novo não configurado.

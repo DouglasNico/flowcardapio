@@ -15,17 +15,39 @@ export function respostaPedidoV2(pedido, {chave, nomeLoja='', token}={}) {
 }
 export async function encaminharPedidoV2({chave,publico,body,idem,token,request=fetch}) {
   const route=publico.integracaoPdv;
-  if(chave!=='LIC-FLOW-937278' || route?.schema!==1 || route.motor!=='v2' || route.slug!=='burger-teste' || !Number.isSafeInteger(route.catalogoVersao)) throw Object.assign(new Error('Rota integrada inválida. Consulte a loja.'),{status:412});
-  if(body.tipo!=='retirada')throw Object.assign(new Error('Este piloto recebe somente pedidos para retirada.'),{status:412});
-  if(!Array.isArray(body.itens)||!body.itens.length)throw Object.assign(new Error('Pedido sem itens.'),{status:400});
+  if(route?.motor!=='v2' || !route.slug || !Number.isSafeInteger(route.catalogoVersao)) {
+    throw Object.assign(new Error('Rota integrada inválida. Consulte a loja.'),{status:412});
+  }
+  const tipo = String(body.tipo || 'retirada').toLowerCase();
+  if(!['retirada', 'delivery', 'mesa'].includes(tipo)) {
+    throw Object.assign(new Error('Tipo de atendimento inválido.'),{status:400});
+  }
+  if(!Array.isArray(body.itens)||!body.itens.length) throw Object.assign(new Error('Pedido sem itens.'),{status:400});
   const itens=body.itens.map(i=>{
-    if((i.variante&&i.variante!=='individual')||(i.extras?.length))throw Object.assign(new Error('Combos e adicionais ainda não foram liberados neste piloto.'),{status:412});
     const p=publico.produtos.find(p=>String(p.id)===String(i.id));
     if(!p)throw Object.assign(new Error('Produto indisponível.'),{status:412});
-    return {produtoId:String(i.id),quantidade:Number(i.quantidade),observacao:String(i.observacao||''),opcoes:[],precoEsperadoCentavos:i.precoEsperadoCentavos??Math.round(Number(p.preco)*100)};
+    const opcoes = Array.isArray(i.opcoes) ? i.opcoes : (Array.isArray(i.extras) ? i.extras : []);
+    return {
+      produtoId:String(i.id),
+      quantidade:Number(i.quantidade),
+      observacao:String(i.observacao||''),
+      opcoes,
+      precoEsperadoCentavos:i.precoEsperadoCentavos??Math.round(Number(p.preco)*100)
+    };
   });
-  // Mesmo login da loja + mesma intenção sempre resultam no mesmo pedido V2.
-  const result=await chamarPedidoV2('criarPedidoPublicoV2',{slug:route.slug,requestId:createHash('sha256').update(idem).digest('hex'),tipo:'retirada',catalogoVersao:route.catalogoVersao,itens},token,request);
+
+  const payload = {
+    slug: route.slug,
+    requestId: createHash('sha256').update(idem).digest('hex'),
+    tipo,
+    mesaId: body.mesaId || null,
+    catalogoVersao: route.catalogoVersao,
+    itens,
+    ...(body.entrega ? { entrega: body.entrega, cotacao: body.cotacao } : {}),
+    ...(body.contato ? { contato: body.contato } : {})
+  };
+
+  const result=await chamarPedidoV2('criarPedidoPublicoV2', payload, token, request);
   const pedido=respostaPedidoV2(result,{chave,nomeLoja:publico.nome,token:result.acompanhamentoToken});
   return {ok:true,reused:result.reutilizado,id:pedido.id,pedido};
 }

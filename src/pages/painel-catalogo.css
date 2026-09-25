@@ -193,3 +193,10 @@ body.is-painel {--bg:#f6f7f9;--line:#dfe4eb;--navy:#15253c;--slate:#506078;--mut
 @media(min-width:1500px) {.is-painel .catalogo-filtros {grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto;}.is-painel .catalogo-filtro-acoes {grid-column:auto;}}
 @media(max-width:1100px) {.is-painel .loja-layout {grid-template-columns:minmax(0,1fr);}}
 @media(max-width:800px) {.is-painel .catalogo-filtros {grid-template-columns:minmax(0,1fr);}.is-painel .catalogo-filtro-acoes {flex-wrap:wrap;}.is-painel .catalogo-filtro-acoes .btn-primary {flex:1;}}
+
+.oferta-resumo p {margin:6px 0;font-size:12px;line-height:1.5;}
+.oferta-resumo s {color:var(--text-muted,#52637a);margin-right:6px;}
+.oferta-periodo {grid-column:1/-1;padding:12px 0;border-top:1px solid #dce3ec;font-size:12px;}
+.oferta-periodo summary {cursor:pointer;}.oferta-periodo summary span {margin-left:8px;color:#52637a;}
+.oferta-datas {display:flex;gap:12px;align-items:end;flex-wrap:wrap;padding:12px 0;}
+.oferta-datas label {display:grid;gap:6px;flex:1;min-width:150px;}.oferta-datas input {width:100%;min-width:0;}

@@ -146,3 +146,23 @@ body.is-menu {--frame:1120px;--paper:#fffdf9;--line:#e6e1d9;--slate:#615e58;--mu
 .is-menu .prod-overlay.is-out {animation-name:menuDimOut;}
 @keyframes menuDimIn {from {background:rgba(23,43,36,0);} to {background:var(--menu-dim);}}
 @keyframes menuDimOut {from {background:var(--menu-dim);} to {background:rgba(23,43,36,0);}}
+
+.is-menu .preco-anterior {color:#6f685f;font-size:.85em;font-weight:400;margin-right:5px;}
+.is-menu .combo-preco-promo {display:block;margin-top:5px;font-size:.9em;}
+.is-menu .combo-escolha {border:1px solid #e4dbcf;border-radius:12px;margin:18px 0;padding:14px;min-width:0;}
+.is-menu .combo-escolha legend {font-size:15px;font-weight:700;padding:0 5px;}
+.is-menu .combo-escolha label {display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 0;}
+.is-menu .combo-escolha label strong {margin-left:auto;white-space:nowrap;}
+.is-menu .combo-escolha p {font-size:13px;color:#6f685f;line-height:1.5;margin:4px 0 10px;}
+.is-menu .combo-escolha input {accent-color:#bb4716;width:18px;height:18px;}
+.is-menu .combo-escolha .combo-bebida {display:grid;gap:8px;font-weight:600;}
+.is-menu .combo-escolha select {width:100%;min-width:0;border:1px solid #d2c8bb;border-radius:8px;padding:12px;background:#fff;color:#202821;font:inherit;}
+
+.is-menu .skeleton-shimmer {
+  background: linear-gradient(90deg, #ede7de 25%, #f7f3ec 50%, #ede7de 75%);
+  background-size: 200% 100%;
+  animation: v2-shimmer 1.5s infinite ease-in-out;
+  border-radius: 6px;
+  display: block;
+}
+

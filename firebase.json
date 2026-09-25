@@ -1,0 +1,9 @@
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "cardapio",
+      "ignore": ["node_modules", ".git", ".env.example"]
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { normalizarOferta, validarPeriodo } from "../../shared/ofertas.js";
 import {centavosDoCampo, ligarCampoReais} from "../lib/moeda.js";
 import {compararCategorias} from "../lib/categorias.js";
 import {ligarBuscaCep} from "../lib/cep.js";
@@ -570,6 +571,12 @@ export async function renderPainel(app, sessao) {
     lista.innerHTML = rows.map((p) => {
       const ov = overlays[p.id] || overlays[String(p.id)] || {};
       const nOp = sanitizarGrupos(ov.grupos).length;
+      let oferta = {}, erroOferta = '';
+      try { oferta = normalizarOferta(p.ofertaCardapio, precoProduto(p)); } catch(err) { erroOferta = err.message; }
+      const combo = licenca.modulos?.combos === true && oferta.combo?.ativo ? oferta.combo : null;
+      const podePromover = oferta.precoPromocional != null || combo?.precoPromocional != null;
+      const dataLocal = iso => iso ? new Date(new Date(iso).getTime() - 3*3600000).toISOString().slice(0,16) : '';
+
       const foto = ov.fotoUrl ? htmlFoto(ov) : `<div class="thumb">${esc((p.nome || "?").slice(0, 1))}</div>`;
       return `
         <article class="prod-card ${ov.visivel ? "on" : ""}" data-id="${esc(p.id)}">
@@ -579,15 +586,21 @@ export async function renderPainel(app, sessao) {
           </div><div class="produto-foto-acoes"><button type="button" class="btn-ghost" data-add-foto>${ico.photo}${ov.fotoUrl ? "Trocar foto" : "Adicionar foto"}</button><input data-foto-input type="file" accept="image/jpeg,image/png,image/webp" hidden>${ov.fotoUrl ? `<button type="button" class="btn-ghost" data-ajustar-foto>Ajustar foto</button>` : ""}${ov.fotoUrl || ov.fotoPublicId ? `<button type="button" class="btn-ghost foto-remover" data-del-foto>Remover foto</button>` : ""}</div></div>
           <div class="prod-card-body">
             <div class="prod-card-top">
-              <h3>${esc(p.nome || "Sem nome")}</h3>
+              <h3>${esc(p.nome || "Sem nome")}${combo ? ' <span class="tag-combo" style="display: inline-flex; align-items: center; margin-left: 6px; font-size: 11px; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 2px 7px; border-radius: 4px; vertical-align: middle; font-weight: 700; letter-spacing: 0.02em;">🍔 COMBO</span>' : ''}</h3>
               <b>${brl(precoProduto(p))}</b>
             </div>
-            <div class="cat">${esc(p.categoria || "Geral")}${nOp ? ` · ${nOp} grupo${nOp > 1 ? "s" : ""} de opção` : ""}${ov.destaque ? " · Destaque" : ""}</div>
+            <div class="cat">${esc(p.categoria || "Geral")}${combo ? ' · <strong style="color: #2563eb;">Combo ativo</strong>' : ''}${nOp ? ` · ${nOp} grupo${nOp > 1 ? "s" : ""} de opção` : ""}${ov.destaque ? " · Destaque" : ""}</div>
 
+            <div class="oferta-resumo">
+              ${oferta.precoPromocional != null ? `<p>Promoção individual: <s>${brl(precoProduto(p))}</s> <b>${brl(oferta.precoPromocional)}</b></p>` : ''}
+              ${combo ? `<p>Combo completo: <b>${brl(combo.preco)}</b>${combo.precoPromocional != null ? ` · Promoção: <b>${brl(combo.precoPromocional)}</b>` : ''}</p>` : ''}
+              ${erroOferta ? `<p role="alert">Confira no PDV: ${esc(erroOferta)}</p>` : ''}
+            </div>
             <div class="prod-card-foot">
               <div class="chip-row">
                 <label class="chip${ov.visivel ? " on" : ""}"><input type="checkbox" data-visivel ${ov.visivel ? "checked" : ""}> No cardápio</label>
                 <label class="chip${ov.destaque ? " on" : ""}"><input type="checkbox" data-destaque ${ov.destaque ? "checked" : ""}> Mais pedido</label>
+                <label class="chip${ov.promocao ? " on" : ""}" title="${podePromover ? 'Usar preço promocional do PDV' : 'Cadastre o valor promocional no PDV'}"><input type="checkbox" data-promocao ${ov.promocao ? 'checked' : ''} ${podePromover || ov.promocao ? '' : 'disabled'}> Promoção</label>
                 <label class="chip warn${ov.esgotado ? " on" : ""}"><input type="checkbox" data-esgotado ${ov.esgotado ? "checked" : ""}> Esgotado</label>
               </div>
               <div class="prod-card-actions">
@@ -596,7 +609,7 @@ export async function renderPainel(app, sessao) {
               </div>
             </div>
           </div>
-
+            ${podePromover ? `<details class="oferta-periodo"><summary>Período da promoção <span>Opcional · horário de Brasília</span></summary><div class="oferta-datas"><label>Início<input type="datetime-local" data-promo-inicio value="${esc(dataLocal(ov.promocaoPeriodo?.inicio))}"></label><label>Término<input type="datetime-local" data-promo-fim value="${esc(dataLocal(ov.promocaoPeriodo?.fim))}"></label><button type="button" class="btn-ghost" data-salvar-periodo>Salvar período</button></div><small>Sem datas, a promoção permanece ativa até você desmarcar e publicar.</small></details>` : ''}
             <details class="produto-editor" ${editoresAbertos.has(String(p.id)) || rascunhos.has(String(p.id)) ? "open" : ""}><summary>Editar descrição ${ico.chevron}</summary><label class="catalogo-desc">Descrição para o cliente<textarea data-desc placeholder="Ingredientes, preparo ou detalhes do produto"></textarea></label>
             <div class="catalogo-save"><button type="button" class="btn-ghost" data-save-desc>Salvar descrição</button><span data-save-state role="status">${esc(estados.get(String(p.id))||"")}</span></div></details>
         </article>
@@ -605,11 +618,19 @@ export async function renderPainel(app, sessao) {
 
     lista.querySelectorAll(".prod-card").forEach((row) => {
       const id = row.dataset.id;
-      row.querySelector("details").addEventListener("toggle",e=>{if(e.target.open)editoresAbertos.add(id);else editoresAbertos.delete(id);});
+      row.querySelector(".produto-editor").addEventListener("toggle",e=>{if(e.target.open)editoresAbertos.add(id);else editoresAbertos.delete(id);});
       const prod = produtos.find((p) => String(p.id) === String(id));
       const ovAtual = () => overlays[id] || overlays[String(id)] || {};
       row.querySelector("[data-visivel]").addEventListener("change", (ev) => patchOverlay(id, { visivel: ev.target.checked }, "[data-visivel]"));
       row.querySelector("[data-destaque]").addEventListener("change", (ev) => patchOverlay(id, { destaque: ev.target.checked }, "[data-destaque]"));
+      row.querySelector('[data-promocao]').addEventListener('change', ev => patchOverlay(id, {promocao:ev.target.checked}, '[data-promocao]'));
+      row.querySelector('[data-salvar-periodo]')?.addEventListener('click', () => {
+        try {
+          const toIso = value => value ? new Date(value + ':00-03:00').toISOString() : null;
+          const promocaoPeriodo = validarPeriodo({inicio:toIso(row.querySelector('[data-promo-inicio]').value),fim:toIso(row.querySelector('[data-promo-fim]').value)});
+          patchOverlay(id, {promocaoPeriodo}, '[data-salvar-periodo]');
+        } catch(err) { toast(err.message); }
+      });
       row.querySelector("[data-esgotado]").addEventListener("change", (ev) => patchOverlay(id, { esgotado: ev.target.checked }, "[data-esgotado]"));
       row.querySelector("[data-add-foto]").addEventListener("click",()=>row.querySelector("[data-foto-input]").click());
       row.querySelector("[data-ajustar-foto]")?.addEventListener("click", () => ajustarFoto(id));
@@ -643,12 +664,7 @@ export async function renderPainel(app, sessao) {
             await salvarOverlay(chave, id, { grupos });
             overlays[id] = { ...ovAtual(), grupos };
             invalidarCardapioPublico();
-            if (overlays[id].visivel) {
-              await publicarCardapio(chave);
-              toast("Opções no cardápio do cliente. Manda ele atualizar a página.");
-            } else {
-              toast("Opções salvas. Marca No cardápio e clica em Publicar.");
-            }
+            toast("Opções salvas. Publique o cardápio para atualizar os clientes.");
             pintarLista();
           }
         });

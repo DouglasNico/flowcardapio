@@ -104,3 +104,31 @@
 .gestao-v2 #g-status[data-tone=success]{background:#eef7f1;border-color:#bad8c5;color:#285743}
 .gestao-v2 #g-status[data-tone=error]{background:#fff1ef;border-color:#e3b7b3;color:#962b24}
 .gestao-v2 .g-result:not(:empty),.gestao-v2 .g-photo-status:not(:empty){padding:12px 14px;background:#edf1f6;border-radius:8px;font-size:13px;line-height:1.6}
+
+/* Pedidos Gestão Mobile & Standalone */
+.gestao-v2 .g-orders-toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0}
+.gestao-v2 .g-audio-toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--slate);cursor:pointer;padding:6px 12px;background:#fff;border:1px solid var(--line);border-radius:8px}
+.gestao-v2 .g-audio-toggle input{width:16px;height:16px}
+.gestao-v2 .g-status-badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:700;letter-spacing:-.01em}
+.gestao-v2 .g-status-novo{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
+.gestao-v2 .g-status-em_preparo{background:#ffedd5;color:#9a3412;border:1px solid #fdba74}
+.gestao-v2 .g-status-pronto{background:#dcfce7;color:#166534;border:1px solid #86efac}
+.gestao-v2 .g-status-saiu_entrega{background:#e0e7ff;color:#3730a3;border:1px solid #a5b4fc}
+.gestao-v2 .g-status-entregue{background:#f1f5f9;color:#475569;border:1px solid #cbd5e1}
+.gestao-v2 .g-status-cancelado{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.gestao-v2 .g-channel-badge{display:inline-flex;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:800;text-transform:uppercase;background:#e2e8f0;color:#334155}
+.gestao-v2 .g-channel-delivery{background:#dbeafe;color:#1e40af}
+.gestao-v2 .g-channel-retirada{background:#dcfce7;color:#15803d}
+.gestao-v2 .g-channel-mesa{background:#fef9c3;color:#854d0e}
+.gestao-v2 .g-order-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.gestao-v2 .g-order-btn{padding:10px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;border:0;transition:all .15s ease}
+.gestao-v2 .g-order-btn:hover{filter:brightness(.95);transform:translateY(-1px)}
+.gestao-v2 .g-order-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.gestao-v2 .g-order-btn-primary{background:var(--navy);color:#fff}
+.gestao-v2 .g-order-btn-success{background:#10b981;color:#fff}
+.gestao-v2 .g-order-btn-warn{background:#f59e0b;color:#fff}
+.gestao-v2 .g-order-btn-cancel{background:#fff;color:#ef4444;border:1px solid #fca5a5}
+.gestao-v2 .g-order-btn-pay{background:#fff;color:#0284c7;border:1px solid #7dd3fc}
+.gestao-v2 .g-order-customer{margin:10px 0;padding:10px 12px;background:#f8fafc;border-radius:8px;font-size:12px;line-height:1.5;color:#334155;border:1px solid #e2e8f0}
+.gestao-v2 .g-order-customer a{color:#059669;font-weight:700;text-decoration:none}
+.gestao-v2 .g-order-customer a:hover{text-decoration:underline}

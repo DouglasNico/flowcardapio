@@ -8,9 +8,16 @@ test('ponte preserva intenção/preço e devolve acompanhamento sem escrever ped
   assert.equal(first.pedido.total,18.9);assert.equal(first.id,'V2-pedido');assert.equal(first.pedido.acompanhamentoV2.length,43);assert.equal(again.reused,true);
   assert.equal(calls[0].body,calls[1].body);assert.ok(calls.every(c=>c.url.endsWith('/criarPedidoPublicoV2')));
 });
-test('outra loja, rota inválida, mesa, combo ou adicional não atravessa a ponte',async()=>{
-  for(const alterar of [x=>x.chave='OUTRA',x=>x.publico.integracaoPdv.slug='outra',x=>x.body.tipo='mesa',x=>x.body.itens[0].variante='combo',x=>x.body.itens[0].extras=[{id:'extra'}]]){
-    const x=entrada();alterar(x);let calls=0;await assert.rejects(encaminharPedidoV2({...x,request:()=>{calls++;}}));assert.equal(calls,0);
+test('rota inválida, sem itens ou produto indisponível é rejeitado', async () => {
+  for (const alterar of [
+    x => x.publico.integracaoPdv.motor = 'invalido',
+    x => x.body.tipo = 'invalido',
+    x => x.body.itens = [],
+    x => x.body.itens[0].id = 'inexistente'
+  ]) {
+    const x = entrada(); alterar(x); let calls = 0;
+    await assert.rejects(encaminharPedidoV2({ ...x, request: () => { calls++; } }));
+    assert.equal(calls, 0);
   }
 });
 test('resposta perdida propaga erro e mantém a mesma intenção para tentar de novo',async()=>{

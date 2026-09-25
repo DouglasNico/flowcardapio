@@ -38,8 +38,44 @@ export async function renderGestaoV2(app) {
     }
     app.querySelector('#g-sair').onclick = async () => { try { await signOut(s.auth); } catch { say('Não foi possível sair. Tente novamente.'); } };
     if (!user.emailVerified) { say('Confirme o e-mail da conta e entre novamente para acessar a gestão.'); return; }
-    content.innerHTML = '<form id="g-store" class="g-form"><h2>Abra sua loja</h2><label>Identificador da loja<input name="loja" required pattern="[A-Za-z0-9_-]{1,80}" maxlength="80" placeholder="Identificador cadastrado no ambiente de teste"></label><button class="btn-primary">Abrir catálogo</button></form><section id="g-catalog"></section>';
-    const storeForm = content.querySelector('#g-store'), catalog = content.querySelector('#g-catalog');
+    const salvoLoja = localStorage.getItem('flowpdv_gestao_loja_id') || '';
+    content.innerHTML = `
+      <form id="g-store" class="g-form">
+        <h2>Abra sua loja</h2>
+        <label>Endereço ou identificador da loja
+          <input name="loja" required pattern="[A-Za-z0-9_-]{1,80}" maxlength="80" placeholder="Ex: burger-teste ou ID da loja" value="${esc(salvoLoja)}">
+        </label>
+        <button class="btn-primary">Abrir catálogo</button>
+        <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px;text-align:center;">
+          <p style="font-size:13px;color:var(--slate);margin-bottom:10px;">Ainda não tem loja cadastrada?</p>
+          <button type="button" class="btn-ghost" id="g-btn-nova-loja" style="width:100%;">+ Cadastrar Nova Loja</button>
+        </div>
+      </form>
+
+      <form id="g-create-store" class="g-form" hidden>
+        <h2>Cadastrar Nova Loja</h2>
+        <p style="font-size:13px;color:var(--slate);margin:0 0 16px;">Crie seu cardápio independente em segundos para operar 100% pelo celular.</p>
+        <label>Nome da loja / restaurante
+          <input name="nome" required maxlength="80" placeholder="Ex: Espetinho do Zé">
+        </label>
+        <label>Endereço do cardápio (Link)
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;color:var(--slate);white-space:nowrap;">flowpdv.app.br/</span>
+            <input name="slug" required pattern="[a-z0-9-]{3,60}" maxlength="60" placeholder="espetinho-do-ze" style="text-transform:lowercase;">
+          </div>
+          <small style="color:var(--slate);font-size:11px;">Apenas letras minúsculas, números e hífens.</small>
+        </label>
+        <div style="display:flex;gap:10px;margin-top:10px;">
+          <button type="submit" class="btn-primary" style="flex:1;">Criar Loja e Começar</button>
+          <button type="button" class="btn-ghost" id="g-btn-voltar-loja">Voltar</button>
+        </div>
+        <p class="g-result" role="status"></p>
+      </form>
+
+      <section id="g-catalog"></section>
+    `;
+    const storeForm = content.querySelector('#g-store'), createForm = content.querySelector('#g-create-store'), catalog = content.querySelector('#g-catalog');
+    const btnNovaLoja = content.querySelector('#g-btn-nova-loja'), btnVoltarLoja = content.querySelector('#g-btn-voltar-loja'), createResult = createForm.querySelector('.g-result');
     let data, lojaId, uncertain = false, busy = false, activeTab = 'catalogo', lojaDraft = null, productDraft = null, deliveryDraft = null, mesaDraft = null, addonDraft = null, contatoDraft = null;
     draftGuard = protegerRascunhosGestao(content, () => busy);
     app.querySelector('#g-sair').onclick = async () => {
@@ -47,6 +83,58 @@ export async function renderGestaoV2(app) {
       if (draftGuard.pending() && !window.confirm('Há alterações não salvas. Deseja descartá-las e sair da conta?')) return;
       try { await signOut(s.auth); } catch { say('Não foi possível sair. Tente novamente.', 'error'); }
     };
+
+    btnNovaLoja.onclick = () => {
+      storeForm.hidden = true;
+      createForm.hidden = false;
+      createForm.elements.nome.focus();
+    };
+
+    btnVoltarLoja.onclick = () => {
+      createForm.hidden = true;
+      storeForm.hidden = false;
+    };
+
+    createForm.elements.nome.oninput = () => {
+      if (!createForm.elements.slug.dataset.manual) {
+        const auto = createForm.elements.nome.value
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 50);
+        createForm.elements.slug.value = auto;
+      }
+    };
+    createForm.elements.slug.oninput = () => {
+      createForm.elements.slug.dataset.manual = 'true';
+    };
+
+    createForm.onsubmit = async e => {
+      e.preventDefault();
+      const nomeLoja = createForm.elements.nome.value.trim();
+      const slugLoja = createForm.elements.slug.value.trim().toLowerCase();
+      if (!nomeLoja || !slugLoja) return;
+
+      createForm.querySelectorAll('button,input').forEach(el => el.disabled = true);
+      createResult.textContent = 'Criando sua loja no FlowPDV…';
+      try {
+        const resp = await s.call('criarLojaIndependenteV2', { nome: nomeLoja, slug: slugLoja });
+        lojaId = resp.slug || resp.lojaId;
+        localStorage.setItem('flowpdv_gestao_loja_id', lojaId);
+        createForm.hidden = true;
+        say('Loja criada com sucesso! Carregando catálogo…', 'success');
+        await load();
+      } catch (err) {
+        createResult.textContent = err.code === 'functions/already-exists'
+          ? 'Este link de cardápio já está em uso por outra loja. Escolha outro.'
+          : (err.message || 'Não foi possível criar a loja. Tente novamente.');
+      } finally {
+        createForm.querySelectorAll('button,input').forEach(el => el.disabled = false);
+      }
+    };
+
     async function load(redraw = true) {
       const result = await s.call('consultarConfiguracaoV2', { lojaId });
       const cursors = new Set();
@@ -58,15 +146,31 @@ export async function renderGestaoV2(app) {
         result.mesas.push(...page.mesas); result.proximaMesa = page.proximaMesa;
       }
       if (!valid()) return;
-      data = result; uncertain = false; if (redraw) draw();
+      data = result;
+      if (result.lojaId) lojaId = result.lojaId;
+      uncertain = false; if (redraw) draw();
     }
     storeForm.onsubmit = async e => {
-      e.preventDefault(); lojaId = storeForm.elements.loja.value.trim(); storeForm.querySelector('button').disabled = true;
+      e?.preventDefault?.(); lojaId = storeForm.elements.loja.value.trim(); storeForm.querySelector('button').disabled = true;
       say('Consultando seu acesso à loja…');
-      try { await load(); if (valid()) { storeForm.hidden = true; say('Catálogo carregado.'); } }
-      catch (e) { say(e.code === 'functions/permission-denied' ? 'Sua conta não tem permissão de gerente nesta loja.' : 'Não foi possível abrir a loja. Confira o identificador e a conexão.'); }
+      try {
+        await load();
+        if (valid()) {
+          storeForm.hidden = true;
+          localStorage.setItem('flowpdv_gestao_loja_id', data.slug || lojaId);
+          say('Catálogo carregado.', 'success');
+        }
+      }
+      catch (e) { say(e.code === 'functions/permission-denied' ? 'Sua conta não tem permissão de gerente nesta loja.' : 'Não foi possível abrir a loja. Confira o endereço ou identificador e a conexão.'); }
       finally { if (valid()) storeForm.querySelector('button').disabled = false; }
     };
+    if (salvoLoja) {
+      setTimeout(() => {
+        if (valid() && !data && storeForm.isConnected) {
+          storeForm.dispatchEvent(new Event('submit'));
+        }
+      }, 50);
+    }
     function draw() {
       let sidebar = app.querySelector('.g-sidebar');
       if (!sidebar) {
@@ -74,12 +178,24 @@ export async function renderGestaoV2(app) {
         sidebar = document.createElement('aside'); sidebar.className = 'g-sidebar';
         sidebar.innerHTML = '<div class="g-side-brand"><img src="/logos/FlowPDV-horizontal-claro.png" alt="FlowPDV"><div class="g-side-store"><strong></strong><small>Gestão do cardápio</small></div></div><div class="g-side-nav"></div><div class="g-side-foot"></div>';
         main.before(shell); shell.append(sidebar, main);
-        const logout = app.querySelector('#g-sair'); if (logout) sidebar.querySelector('.g-side-foot').append(logout);
-        const preview = document.createElement('a'); preview.className = 'g-side-preview'; preview.target = '_blank'; preview.rel = 'noopener'; preview.innerHTML = `${ico.eye}<span>Ver cardápio de teste</span>${ico.external}`;
-        sidebar.querySelector('.g-side-foot').prepend(preview);
+        const logout = app.querySelector('#g-sair');
+        const foot = sidebar.querySelector('.g-side-foot');
+        const switchBtn = document.createElement('button');
+        switchBtn.type = 'button';
+        switchBtn.className = 'btn-ghost';
+        switchBtn.style.cssText = 'color:#94a3b8;font-size:12px;text-align:left;padding:6px 0;border:0;background:none;cursor:pointer;';
+        switchBtn.textContent = '⇄ Trocar de loja';
+        switchBtn.onclick = () => {
+          localStorage.removeItem('flowpdv_gestao_loja_id');
+          location.reload();
+        };
+        foot.append(switchBtn);
+        if (logout) foot.append(logout);
+        const preview = document.createElement('a'); preview.className = 'g-side-preview'; preview.target = '_blank'; preview.rel = 'noopener'; preview.innerHTML = `${ico.eye}<span>Ver cardápio online</span>${ico.external}`;
+        foot.prepend(preview);
       }
       sidebar.querySelector('.g-side-store strong').textContent = data.nome || 'Minha loja';
-      sidebar.querySelector('.g-side-preview').href = `/v2/${encodeURIComponent(data.slug)}`;
+      sidebar.querySelector('.g-side-preview').href = `/${encodeURIComponent(data.slug)}`;
       const products = data.catalogo?.produtos || [];
       catalog.innerHTML = `<header class="page-head"><div><h2>${esc(data.nome)}</h2><p>${products.length} ${products.length === 1 ? 'produto' : 'produtos'} no catálogo</p></div><button class="btn-ghost" id="g-reload">Recarregar catálogo</button></header><label class="g-search">Buscar produto<input id="g-search" type="search" placeholder="Nome ou categoria"></label><div class="g-products"></div><div id="g-editor"></div>`;
       const list = catalog.querySelector('.g-products'), editor = catalog.querySelector('#g-editor');
@@ -163,7 +279,11 @@ export async function renderGestaoV2(app) {
       });
       const ordersTab = document.createElement('button'); ordersTab.type = 'button'; ordersTab.dataset.section = 'pedidos'; ordersTab.textContent = 'Pedidos'; tabs.append(ordersTab);
       const ordersPanel = document.createElement('section'); ordersPanel.id = 'g-panel-pedidos'; catalog.append(ordersPanel);
-      const orders = renderPedidosGestao(ordersPanel, apos => s.call('listarPedidosGestaoV2', { lojaId, ...(apos ? { apos } : {}) }), valid);
+      const orders = renderPedidosGestao(ordersPanel, {
+        read: apos => s.call('listarPedidosGestaoV2', { lojaId, ...(apos ? { apos } : {}) }),
+        updateStatus: (pedidoId, status, pagamento) => s.call('atualizarStatusPedidoGestaoV2', { lojaId, pedidoId, status, ...(pagamento ? { pagamento } : {}) }),
+        lojaId
+      }, valid);
       const shopPanel = document.createElement('section'); shopPanel.id = 'g-panel-loja'; catalog.append(shopPanel);
       const deliveryPanel = document.createElement('section'); deliveryPanel.id = 'g-panel-delivery'; catalog.append(deliveryPanel);
       const mesasPanel = document.createElement('section'); mesasPanel.id = 'g-panel-mesas'; catalog.append(mesasPanel);

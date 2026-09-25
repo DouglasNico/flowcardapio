@@ -1,3 +1,4 @@
+import { publicarOferta } from "../../shared/ofertas.js";
 import { entregaPublica } from "../../shared/entrega.js";
 import { normalizarEnquadramento } from "./foto.js";
 import {
@@ -101,6 +102,7 @@ export async function publicarCardapio(chave) {
       id: String(p.id),
       nome: String(p.nome || p.descricao || "").trim(),
       preco: precoProduto(p),
+      ...publicarOferta(p, ov, backup.produtos || [], licenca.modulos || {}),
       categoria: String(p.categoria || "Geral"),
       descricao: String(ov.descricao || "").slice(0, 400),
       fotoUrl: String(ov.fotoUrl || ""),
@@ -112,7 +114,12 @@ export async function publicarCardapio(chave) {
     });
   });
   const cfgLoja = backup.config || {};
-  await setDoc(doc(db, "cardapio_publico", chave), {
+  const pubRef = doc(db, "cardapio_publico", chave);
+  const pubAtual = (await getDoc(pubRef)).data() || {};
+  const integracaoPdv = pubAtual.integracaoPdv && typeof pubAtual.integracaoPdv === 'object'
+    ? pubAtual.integracaoPdv
+    : undefined;
+  await setDoc(pubRef, {
     chave,
     nome: nomeDaLoja(licenca),
     logoUrl: String(licenca.logoUrl || cfgLoja.logoUrl || ""),
@@ -127,7 +134,8 @@ export async function publicarCardapio(chave) {
     pedidoMinimoTexto: String(config.pedidoMinimoTexto != null ? config.pedidoMinimoTexto : "Sem pedido mínimo").slice(0, 60),
     endereco: String(config.endereco || licenca.endereco || licenca.cidade || "").slice(0, 500),
     produtos: publicados,
-    publicadoEm: new Date().toISOString()
+    publicadoEm: new Date().toISOString(),
+    ...(integracaoPdv ? { integracaoPdv } : {})
   });
   return { ok: true, total: publicados.length };
 }

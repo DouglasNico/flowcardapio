@@ -81,6 +81,10 @@ export async function criarPedido(payload) {
     body: JSON.stringify(payload)
   });
   const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw new Error(data.error || "Falha ao enviar o pedido.");
+  if (!resp.ok) {
+    const err = new Error(data.error || "Falha ao enviar o pedido.");
+    err.code = data.code;
+    throw err;
+  }
   return data;
 }

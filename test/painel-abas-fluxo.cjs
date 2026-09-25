@@ -1,0 +1,23 @@
+const assert=require('assert/strict');
+module.exports=async({js,wait})=>{
+ await js(`document.querySelector('[data-aba="loja"]').click();document.querySelector('#pausado').click();document.querySelector('#lj-end').value='Rua de teste, 15';document.querySelector('#lj-end').dispatchEvent(new Event('input'));fixture.failConfig=true;document.querySelector('#lj-salvar').click()`);
+ await wait("document.querySelector('#lj-saved').textContent.includes('Não foi possível')");
+ assert.equal(await js('!!fixture.config?.pausado'),false);assert.equal(await js("document.querySelector('#pausado').checked"),true);
+ await js(`document.querySelector('[data-aba="qr"]').click();document.querySelector('[data-aba="loja"]').click()`);
+ assert.equal(await js("document.querySelector('#lj-end').value"),'Rua de teste, 15');
+ await js("fixture.failConfig=false;document.querySelector('#lj-salvar').click()");await wait("document.querySelector('#lj-saved').textContent==='Alterações salvas.'");assert.equal(await js('fixture.config.pausado'),true);
+ await js(`document.querySelector('[data-dia].on').click();document.querySelector('#lj-min-val').value='-1';document.querySelector('#lj-min-val').dispatchEvent(new Event('input'));document.querySelector('#lj-salvar').click()`);assert.match(await js("document.querySelector('#lj-saved').textContent"),/mínimo válido/);
+ await js(`document.querySelector('[data-aba="pedidos"]').click();fixture.failStatus=true;document.querySelector('[data-id="PED-10001"][data-st="em_preparo"]').click()`);
+ assert.equal(await js("document.querySelector('.k-card[data-id=\"PED-10001\"] .badge').textContent"),'Novo');
+ await wait("document.querySelector('.pedido-feedback').textContent.includes('Não foi possível')");assert.equal(await js("fixture.pedidos[0].status"),'novo');
+ await js(`fixture.failStatus=false;document.querySelector('[data-id="PED-10001"][data-st="em_preparo"]').click()`);
+ await wait("fixture.pedidos[0].status==='em_preparo'");await js('fixture.emitPedidos()');await wait("document.querySelector('.k-card[data-id=\"PED-10001\"] .badge').textContent==='Em preparo'");
+ await js("fixture.erroPedidos(Error('<erro> Conexão interrompida'))");await wait("!!document.querySelector('#pedidos-retry')");assert.equal(await js("document.querySelector('erro')"),null);
+ await js("document.querySelector('#pedidos-retry').click()");await wait("document.querySelectorAll('.k-card').length===2");
+ await js(`document.querySelector('[data-aba="qr"]').click();document.querySelector('#mesa-n').value='2';document.querySelector('#mesa-n').dispatchEvent(new Event('input'));document.querySelector('#mesa-n').value='3';document.querySelector('#mesa-n').dispatchEvent(new Event('input'))`);
+ await wait("document.querySelector('#qr-mesa-art strong')?.textContent==='Mesa 3'");assert.match(await js("document.querySelector('#qr-mesa-url').textContent"),/mesa\/3$/);
+ await js("document.querySelector('#mesa-n').value='0';document.querySelector('#mesa-n').dispatchEvent(new Event('input'))");assert.equal(await js("document.querySelector('#qr-mesa-baixar').disabled"),true);
+ await js(`document.querySelector('#mesa-n').value='4';document.querySelector('#mesa-n').dispatchEvent(new Event('input'));document.querySelector('[data-aba="loja"]').click()`);await js('new Promise(r=>setTimeout(r,100))');assert.equal(await js("document.querySelector('h2').textContent"),'Loja no cardápio');
+ assert.equal(await js('fixture.publicacoes'),0);
+ console.log('ABAS PASS: rascunho e falha da loja, pedido sem confirmação antecipada, recuperação da consulta, QR atual e navegação segura.');
+};

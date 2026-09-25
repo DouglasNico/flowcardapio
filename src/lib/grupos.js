@@ -1,3 +1,4 @@
+import { precoOferta, centavos } from "../../shared/ofertas.js";
 import { ico } from "./icons.js";
 export function novoId(prefixo = "id") {
   return `${prefixo}-${Math.random().toString(36).slice(2, 9)}`;
@@ -64,7 +65,7 @@ export function sanitizarGrupos(grupos) {
 }
 
 export function precoBase(prod) {
-  return Number(prod && prod.preco) || 0;
+  return precoOferta(prod || {preco:0}).preco;
 }
 
 export function precoMinimo(prod) {
@@ -125,9 +126,9 @@ export function totalExtrasLinha(prod, extras) {
   return precoExtras(prod, extras);
 }
 
-export function precoLinha(prod, extras, quantidade) {
+export function precoLinha(prod, extras, quantidade, variante = 'individual') {
   const q = Math.max(1, Number(quantidade) || 1);
-  return (precoBase(prod) + precoExtras(prod, extras)) * q;
+  return (centavos(precoOferta(prod, variante).preco) + centavos(precoExtras(prod, extras))) * q / 100;
 }
 
 export function validarExtras(prod, extrasIn) {

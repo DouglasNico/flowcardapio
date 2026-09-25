@@ -1,3 +1,4 @@
+import { precoOferta, comporCombo, centavos } from "../shared/ofertas.js";
 import { calcularEntrega } from "../shared/entrega.js";
 import {
   emailDaLoja,
@@ -143,6 +144,9 @@ export default async function handler(req, res) {
     if (!itensIn.length) return json(res, 400, { error: "Pedido sem itens." });
     if (itensIn.length > 50) return json(res, 400, { error: "Pedido grande demais." });
 
+    const precisaLicenca = itensIn.some(i => i?.variante === 'combo');
+    const licenca = precisaLicenca ? await getDocRest(`licencas/${chavePath}`, token) : null;
+    const agoraPreco = Date.now();
     const itens = [];
     let total = 0;
     for (const raw of itensIn) {
@@ -150,8 +154,10 @@ export default async function handler(req, res) {
       if (!prod || prod.esgotado) {
         return json(res, 412, { error: "Um item não está mais disponível." });
       }
-      const quantidade = Math.max(1, Math.min(99, parseFloat(raw.quantidade) || 0));
-      if (!quantidade) return json(res, 400, { error: "Quantidade inválida." });
+      const quantidade = Number(raw.quantidade);
+      if (!Number.isFinite(quantidade) || quantidade <= 0 || quantidade > 99) return json(res,400,{error:'Quantidade inválida.'});
+      const variante = raw.variante || 'individual';
+      if (variante === 'combo' && !Number.isInteger(quantidade)) return json(res,400,{error:'Informe uma quantidade inteira de combos.'});
       let extras;
       try {
         extras = validarExtras(prod, raw && raw.extras);
@@ -159,15 +165,31 @@ export default async function handler(req, res) {
         return json(res, err.status || 400, { error: err.message || "Opções inválidas." });
       }
       const extrasTotal = totalExtrasLinha(prod, extras);
-      const preco = Number(prod.preco) || 0;
-      const precoUnitario = preco + extrasTotal;
+      let oferta, componentes = [];
+      try {
+        oferta = precoOferta(prod, variante, agoraPreco);
+        if (variante === 'combo') componentes = comporCombo(prod, raw.bebidaId, licenca?.modulos?.combos === true);
+      } catch(err) { return json(res,412,{error:err.message}); }
+      const preco = oferta.preco;
+      const precoUnitarioCentavos = centavos(preco) + centavos(extrasTotal);
+      const precoUnitario = precoUnitarioCentavos / 100;
+      if ((prod.ofertasVersao === 1 || prod.promocao?.ativa || variante === 'combo' || raw.precoEsperadoCentavos != null) && raw.precoEsperadoCentavos !== precoUnitarioCentavos) {
+        return json(res,409,{code:'PRECO_ALTERADO',error:'O preço de um item mudou. Atualize o pedido e confira o novo total antes de confirmar.'});
+      }
       const observacao = String((raw && raw.observacao) || "").slice(0, 180);
-      const detalhe = textoExtras(extras);
+      const detalheCombo = variante === 'combo' ? 'Combo: ' + componentes.slice(1).map(c => `${c.quantidade}× ${c.nome} (incluso)`).join(', ') : '';
+      const detalhe = [detalheCombo, textoExtras(extras)].filter(Boolean).join('; ');
       itens.push({
         id: String(prod.id),
         nome: prod.nome,
         quantidade,
         preco,
+        variante,
+        bebidaId: variante === 'combo' ? String(raw.bebidaId) : null,
+        precoNormal: oferta.normal,
+        promocaoAplicada: oferta.promocao,
+        componentes,
+        ofertasVersao: 1,
         extras,
         extrasTotal,
         precoUnitario,
@@ -176,7 +198,7 @@ export default async function handler(req, res) {
         fotoUrl: String(prod.fotoUrl || ""),
         origemPedidoId: pedidoId
       });
-      total += precoUnitario * quantidade;
+      total += Math.round(precoUnitarioCentavos * quantidade) / 100;
     }
 
     const subtotal = Math.round(total*100)/100;

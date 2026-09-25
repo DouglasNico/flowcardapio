@@ -17,11 +17,71 @@ export function ambienteV2() {
   services = { auth, db, call: async (name, data) => (await httpsCallable(fn, name, { timeout: 12000 })(data)).data };
   return services;
 }
+import { SLUG_POR_CHAVE_V2 } from './slug-publico.js';
+
 export async function catalogoV2(slug) {
   const s = ambienteV2();
   const snapshot = await getDocFromServer(doc(s.db, 'catalogos_publicos_v2', slug));
   if (!snapshot.exists()) throw new Error('Cardápio não encontrado.');
-  return snapshot.data();
+  const data = snapshot.data();
+
+  // Enriquecer com dados em tempo real configurados no painel (horários, tempo de entrega, endereço, contato, logo)
+  const chave = data.chaveLicenca || Object.entries(SLUG_POR_CHAVE_V2).find(([, v]) => v === slug)?.[0];
+  if (chave) {
+    try {
+      const pubSnap = await getDocFromServer(doc(s.db, 'cardapio_publico', chave));
+      if (pubSnap.exists()) {
+        const pub = pubSnap.data();
+        const produtosMesclados = (data.produtos || []).map(p => {
+          const pubP = pub.produtos?.find(x => x.id === p.id);
+          if (!pubP) return p;
+
+          let grupos = p.grupos;
+          if ((!grupos || !grupos.length) && pubP.grupos?.length) {
+            grupos = pubP.grupos.map(g => ({
+              id: g.id,
+              nome: g.nome,
+              tipo: g.tipo || (g.max === 1 ? 'single' : 'multi'),
+              min: g.min ?? 0,
+              max: g.max ?? 1,
+              precoCentavos: Math.round((Number(g.precoGrupo) || 0) * 100),
+              inclusoNome: g.inclusoNome || '',
+              opcoes: (g.opcoes || []).map(o => ({
+                id: o.id,
+                nome: o.nome,
+                descricao: o.descricao || '',
+                precoCentavos: o.precoCentavos != null ? o.precoCentavos : Math.round((Number(o.preco) || 0) * 100),
+                ativo: o.ativo !== false,
+                maxQuantidade: o.maxQuantidade || (g.tipo === 'single' ? 1 : 10)
+              }))
+            }));
+          }
+
+          return {
+            ...p,
+            descricao: p.descricao || pubP.descricao || '',
+            imagemUrl: p.imagemUrl || pubP.fotoUrl || '',
+            grupos: grupos || p.grupos || []
+          };
+        });
+
+        return {
+          ...data,
+          produtos: produtosMesclados,
+          horarioTexto: pub.horarioTexto || data.horarioTexto,
+          entregaTexto: pub.entregaTexto || data.entregaTexto,
+          endereco: pub.endereco || data.endereco,
+          whatsapp: pub.whatsapp || data.whatsapp,
+          telefone: pub.whatsapp || data.telefone,
+          pedidoMinimoTexto: pub.pedidoMinimoTexto || data.pedidoMinimoTexto,
+          logoUrl: pub.logoUrl || data.logoUrl,
+          logotipoUrl: pub.logoUrl || data.logotipoUrl,
+          pausado: pub.pausado !== undefined ? pub.pausado : data.pausado,
+        };
+      }
+    } catch { /* fallback seguro com dados existentes */ }
+  }
+  return data;
 }
 export async function sessaoConsumidor() {
   const { auth } = ambienteV2(); await auth.authStateReady();

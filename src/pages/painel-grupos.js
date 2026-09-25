@@ -260,7 +260,7 @@ export function abrirEditorGrupos({ produto, overlay, produtos, onSave, onClose 
         </div>
         <button type="button" class="icon-btn" id="ed-fechar" aria-label="Fechar">${ico.close}</button>
       </header>
-      <p class="editor-help">Isso aparece quando o cliente toca no lanche. Salvar já atualiza o cardápio público.</p>
+      <p class="editor-help">Isso aparece quando o cliente toca no lanche. Depois de salvar, publique o cardápio para atualizar os clientes.</p>
       <div class="editor-templates">
         ${TEMPLATES.map((t, i) => `<button type="button" class="btn-ghost" data-tpl="${i}">+ ${esc(t.nome)}</button>`).join("")}
       </div>
