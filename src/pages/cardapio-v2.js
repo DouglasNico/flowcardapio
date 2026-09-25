@@ -1712,7 +1712,19 @@ export async function renderCardapioV2(app, atendimento = null) {
         <p id="v2-tracking-state" style="font-size:12.5px; color:var(--v2-text-muted); margin:14px 0 0;">
           Acompanhando situação do pedido em tempo real…
         </p>
-        <button type="button" id="v2-new" class="v2-cart-submit-btn" style="margin-top:18px; justify-content:center; width:100%;">
+        ${(() => {
+          const telRaw = catalog?.whatsapp || catalog?.telefone || catalog?.contato?.telefone;
+          const telDigitos = String(telRaw || '').replace(/\D/g, '');
+          if (telDigitos.length < 10) return '';
+          const msg = encodeURIComponent(`Olá! Fiz o pedido #${order.pedidoId.slice(-6).toUpperCase()} no cardápio digital.`);
+          return `
+            <a href="https://wa.me/55${telDigitos}?text=${msg}" target="_blank" rel="noopener" style="display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; margin-top:14px; padding:12px 16px; border-radius:var(--v2-radius-md); background:#25D366; color:#ffffff; font-weight:700; font-size:14px; box-shadow:0 2px 8px rgba(37,211,102,0.25);">
+              <span style="display:inline-flex; width:20px; height:20px;">${ico.wa}</span>
+              <span>Avisar no WhatsApp do restaurante</span>
+            </a>
+          `;
+        })()}
+        <button type="button" id="v2-new" class="v2-cart-submit-btn" style="margin-top:14px; justify-content:center; width:100%; background:var(--v2-surface-alt); color:var(--v2-text); border:1px solid var(--v2-border);">
           Fazer outro pedido
         </button>
       </section>

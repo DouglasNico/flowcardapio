@@ -15,7 +15,8 @@ export function resolverAmbienteV2(env, page) {
   if (env.VITE_V2_HOSPEDADO !== 'true') throw Error('A V2 ainda não foi habilitada neste ambiente.');
   let origin;
   try { origin = new URL(env.VITE_V2_ORIGEM); } catch { throw Error('Endereço da V2 não configurado.'); }
-  if (origin.protocol !== 'https:' || origin.origin !== page.origin || origin.href !== origin.origin + '/' || origin.username || origin.password) throw Error('Endereço não autorizado para a V2.');
+  const ehOrigemAutorizada = origin.origin === page.origin || (page.protocol === 'https:' && page.hostname.endsWith('.vercel.app'));
+  if (origin.protocol !== 'https:' || !ehOrigemAutorizada || origin.href !== origin.origin + '/' || origin.username || origin.password) throw Error('Endereço não autorizado para a V2.');
   return { local: false, firebase: {
     apiKey: 'AIzaSyBn1tl0IBQoWZBmunYtRSb-i74Yhe5OAFg',
     authDomain: 'aplicativo-pdv.firebaseapp.com', projectId: 'aplicativo-pdv',
