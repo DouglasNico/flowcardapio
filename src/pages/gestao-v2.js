@@ -159,9 +159,9 @@ export async function renderGestaoV2(app) {
           </div>
           <p class="g-result" role="status"></p>
         </form>
-
-        <section id="g-catalog"></section>
       </div>
+
+      <section id="g-catalog" hidden></section>
     `;
     const storeCard = content.querySelector('#g-store-card'), storeForm = content.querySelector('#g-store'), createForm = content.querySelector('#g-create-store'), catalog = content.querySelector('#g-catalog');
     const btnNovaLoja = content.querySelector('#g-btn-nova-loja'), btnVoltarLoja = content.querySelector('#g-btn-voltar-loja'), createResult = createForm.querySelector('.g-result');
@@ -250,6 +250,11 @@ export async function renderGestaoV2(app) {
         createForm.hidden = true;
         say('Loja criada com sucesso! Carregando catálogo…', 'success');
         await load();
+        if (valid()) {
+          const wrapper = content.querySelector('.g-onboard-wrapper');
+          if (wrapper) { wrapper.hidden = true; wrapper.style.display = 'none'; }
+          say('');
+        }
       } catch (err) {
         createResult.textContent = err.code === 'functions/already-exists'
           ? 'Este link de cardápio já está em uso por outra loja. Escolha outro.'
@@ -281,11 +286,11 @@ export async function renderGestaoV2(app) {
         await load();
         if (valid()) {
           const wrapper = content.querySelector('.g-onboard-wrapper');
-          if (wrapper) wrapper.hidden = true;
+          if (wrapper) { wrapper.hidden = true; wrapper.style.display = 'none'; }
           if (storeCard) storeCard.hidden = true;
           storeForm.hidden = true;
           localStorage.setItem('flowpdv_gestao_loja_id', data.slug || lojaId);
-          say('Catálogo carregado.', 'success');
+          say('');
         }
       }
       catch (e) { say(e.code === 'functions/permission-denied' ? 'Sua conta não tem permissão de gerente nesta loja.' : 'Não foi possível abrir a loja. Confira o endereço ou identificador e a conexão.'); }
@@ -300,9 +305,21 @@ export async function renderGestaoV2(app) {
     }
     function draw() {
       const topbar = app.querySelector('.g-topbar');
-      if (topbar) topbar.hidden = true;
+      if (topbar) {
+        topbar.hidden = true;
+        topbar.style.display = 'none';
+      }
       const wrapper = content.querySelector('.g-onboard-wrapper');
-      if (wrapper) wrapper.hidden = true;
+      if (wrapper) {
+        wrapper.hidden = true;
+        wrapper.style.display = 'none';
+      }
+      catalog.hidden = false;
+      catalog.style.display = '';
+      const curStatus = app.querySelector('#g-status');
+      if (curStatus && (curStatus.textContent.includes('Carregando') || curStatus.textContent.includes('Consultando') || curStatus.textContent.includes('criada com sucesso'))) {
+        say('');
+      }
       let sidebar = app.querySelector('.g-sidebar');
       if (!sidebar) {
         const main = app.querySelector('main.gestao-v2'), shell = document.createElement('div'); shell.className = 'g-shell';
@@ -311,6 +328,13 @@ export async function renderGestaoV2(app) {
         main.before(shell); shell.append(sidebar, main);
         const logout = app.querySelector('#g-sair');
         const foot = sidebar.querySelector('.g-side-foot');
+        if (user?.email) {
+          const userMeta = document.createElement('div');
+          userMeta.style.cssText = 'color:#64748b;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:4px 0 8px;border-bottom:1px solid #25374f;';
+          userMeta.title = user.email;
+          userMeta.textContent = user.email;
+          foot.append(userMeta);
+        }
         const switchBtn = document.createElement('button');
         switchBtn.type = 'button';
         switchBtn.className = 'btn-ghost';
