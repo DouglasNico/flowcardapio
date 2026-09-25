@@ -12,10 +12,12 @@ export function resolverAmbienteV2(env, page) {
       appId: '1:892832112899:web:ee49b0ea26a76211680936'
     } };
   }
-  if (env.VITE_V2_HOSPEDADO !== 'true') throw Error('A V2 ainda não foi habilitada neste ambiente.');
+  const origemPadrao = env.VITE_V2_ORIGEM || 'https://flowpdv.app.br/';
+  const habilitado = env.VITE_V2_HOSPEDADO === 'true' || (typeof page !== 'undefined' && page.protocol === 'https:' && (page.hostname === 'flowpdv.app.br' || page.hostname.endsWith('.vercel.app')));
+  if (!habilitado) throw Error('A V2 ainda não foi habilitada neste ambiente.');
   let origin;
-  try { origin = new URL(env.VITE_V2_ORIGEM); } catch { throw Error('Endereço da V2 não configurado.'); }
-  const ehOrigemAutorizada = origin.origin === page.origin || (page.protocol === 'https:' && page.hostname.endsWith('.vercel.app'));
+  try { origin = new URL(origemPadrao); } catch { throw Error('Endereço da V2 não configurado.'); }
+  const ehOrigemAutorizada = origin.origin === page.origin || (page.protocol === 'https:' && (page.hostname === 'flowpdv.app.br' || page.hostname.endsWith('.vercel.app')));
   if (origin.protocol !== 'https:' || !ehOrigemAutorizada || origin.href !== origin.origin + '/' || origin.username || origin.password) throw Error('Endereço não autorizado para a V2.');
   return { local: false, firebase: {
     apiKey: 'AIzaSyBn1tl0IBQoWZBmunYtRSb-i74Yhe5OAFg',
