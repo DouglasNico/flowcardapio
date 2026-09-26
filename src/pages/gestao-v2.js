@@ -4,7 +4,7 @@ import { ico } from '../lib/icons.js';
 import { renderContatoGestao } from './gestao-contato-v2.js';
 import { renderFotoGestao, validarFotoV2 } from './gestao-foto-v2.js';
 import { renderAdicionaisGestao } from './gestao-adicionais-v2.js';
-import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut, updatePassword } from 'firebase/auth';
 import { mascaraMoeda, formatarBRL, mascaraTelefone } from '../lib/moeda.js';
 import { ambienteGestaoV2 } from '../lib/gestao-v2.js';
 import { htmlFoto } from '../lib/foto.js';
@@ -404,6 +404,96 @@ export async function renderGestaoV2(app) {
         say('');
       }
 
+      // Troca de Senha Obrigatória no Primeiro Acesso
+      if (data.exigirTrocaSenha === true && !document.getElementById('g-modal-primeiro-acesso')) {
+        const modalEl = document.createElement('div');
+        modalEl.id = 'g-modal-primeiro-acesso';
+        modalEl.className = 'g-modal-overlay active';
+        modalEl.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.85); z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(6px);';
+        modalEl.innerHTML = `
+          <div style="background:#fff; border-radius:18px; max-width:440px; width:100%; padding:32px 28px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); text-align:left;">
+            <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px;">
+              <div style="width:48px; height:48px; border-radius:14px; background:#eff6ff; color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0;">
+                🔒
+              </div>
+              <div>
+                <h3 style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">Primeiro Acesso</h3>
+                <span style="font-size:13px; color:#64748b;">Cadastre sua senha definitiva</span>
+              </div>
+            </div>
+            <p style="font-size:13.5px; color:#475569; line-height:1.5; margin:0 0 20px;">
+              Por segurança, como este é seu primeiro login com a senha provisória, crie uma senha pessoal definitiva para continuar gerenciando sua loja.
+            </p>
+            <form id="g-form-troca-senha" style="display:flex; flex-direction:column; gap:14px;">
+              <div>
+                <label for="g-nova-senha" style="font-size:12.5px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Nova Senha (mínimo 6 caracteres)</label>
+                <input id="g-nova-senha" type="password" required minlength="6" placeholder="••••••••" autocomplete="new-password" style="width:100%; padding:11px 14px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px; box-sizing:border-box;">
+              </div>
+              <div>
+                <label for="g-confirma-senha" style="font-size:12.5px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Confirmar Nova Senha</label>
+                <input id="g-confirma-senha" type="password" required minlength="6" placeholder="••••••••" autocomplete="new-password" style="width:100%; padding:11px 14px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px; box-sizing:border-box;">
+              </div>
+              <p id="g-troca-senha-msg" style="font-size:13px; color:#dc2626; margin:2px 0 0;" hidden></p>
+              <button type="submit" class="btn-primary" style="margin-top:8px; padding:13px; font-size:14.5px; font-weight:600; border-radius:10px; width:100%; cursor:pointer; background:#2563eb; color:#fff; border:none;">
+                Salvar Senha e Acessar Painel →
+              </button>
+            </form>
+          </div>
+        `;
+        document.body.append(modalEl);
+        document.body.classList.add('g-modal-open');
+
+        const formTroca = modalEl.querySelector('#g-form-troca-senha');
+        const msgEl = modalEl.querySelector('#g-troca-senha-msg');
+        const submitBtn = formTroca.querySelector('button[type="submit"]');
+
+        formTroca.onsubmit = async ev => {
+          ev.preventDefault();
+          msgEl.hidden = true;
+          const p1 = formTroca.querySelector('#g-nova-senha').value;
+          const p2 = formTroca.querySelector('#g-confirma-senha').value;
+          if (p1.length < 6) {
+            msgEl.textContent = 'A senha deve ter no mínimo 6 caracteres.';
+            msgEl.hidden = false;
+            return;
+          }
+          if (p1 !== p2) {
+            msgEl.textContent = 'As senhas não coincidem. Digite a mesma senha nos dois campos.';
+            msgEl.hidden = false;
+            return;
+          }
+
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Salvando nova senha…';
+
+          try {
+            if (s.auth.currentUser) {
+              await updatePassword(s.auth.currentUser, p1);
+            }
+            if (s.db) {
+              const { doc, setDoc } = await import('firebase/firestore');
+              await setDoc(doc(s.db, 'lojas_v2', lojaId), { exigirTrocaSenha: false }, { merge: true }).catch(() => {});
+              if (s.auth.currentUser?.uid) {
+                await setDoc(doc(s.db, 'usuarios_lojistas', s.auth.currentUser.uid), { exigirTrocaSenha: false }, { merge: true }).catch(() => {});
+              }
+            }
+            data.exigirTrocaSenha = false;
+            modalEl.remove();
+            document.body.classList.remove('g-modal-open');
+            say('🎉 Senha cadastrada com sucesso! Bem-vindo ao FlowPDV.', 'success');
+          } catch (err) {
+            console.error('Erro na troca de senha:', err);
+            msgEl.textContent = err.code === 'auth/requires-recent-login'
+              ? 'Por segurança, saia e entre novamente com a senha antes de alterá-la.'
+              : (err.message || 'Erro ao atualizar a senha. Tente novamente.');
+            msgEl.hidden = false;
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Salvar Senha e Acessar Painel →';
+          }
+        };
+      }
+
       const published = data.catalogo?.publicado === true, enabled = data.modulos.cardapio === true;
       const storeLogo = data.catalogo?.logoUrl || data.catalogo?.logotipoUrl || data.logoUrl || '';
       const storeInitials = (data.nome || 'LP').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -425,10 +515,17 @@ export async function renderGestaoV2(app) {
               </div>
               <div class="g-store-meta-box">
                 <strong class="g-store-name-txt" title="${esc(data.nome)}">${esc(data.nome || 'Minha Loja')}</strong>
-                <span class="g-store-status-badge ${published && enabled ? 'is-live' : 'is-paused'}">
-                  <span class="g-status-dot-pulse"></span>
-                  <span>${published && enabled ? 'Cardápio no ar' : 'Pausado'}</span>
-                </span>
+                <div style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">
+                  <span class="g-store-status-badge ${published && enabled ? 'is-live' : 'is-paused'}">
+                    <span class="g-status-dot-pulse"></span>
+                    <span>${published && enabled ? 'Cardápio no ar' : 'Pausado'}</span>
+                  </span>
+                  ${data.tipoContratacao === 'apenas_web' ? `
+                    <span style="font-size:10.5px; font-weight:600; color:#1d4ed8; background:#eff6ff; padding:1px 6px; border-radius:4px; display:inline-block; width:fit-content; border:1px solid #bfdbfe;">
+                      🌐 Cardápio Online Web
+                    </span>
+                  ` : ''}
+                </div>
               </div>
             </div>
           </div>
@@ -581,8 +678,9 @@ export async function renderGestaoV2(app) {
       };
 
       // Abas de Seções
+      const temMesas = data.modulos?.mesas !== false || data.modulos?.comandas !== false;
       const tabs = document.createElement('nav'); tabs.className = 'g-tabs'; tabs.setAttribute('aria-label', 'Seções da gestão');
-      tabs.innerHTML = '<button type="button" data-section="catalogo">Catálogo</button><button type="button" data-section="loja">Loja</button><button type="button" data-section="delivery">Delivery</button><button type="button" data-section="mesas">Mesas e QR</button>';
+      tabs.innerHTML = `<button type="button" data-section="catalogo">Catálogo</button><button type="button" data-section="loja">Loja</button><button type="button" data-section="delivery">Delivery</button>${temMesas ? '<button type="button" data-section="mesas">Mesas e QR</button>' : ''}`;
       catalog.insertBefore(tabs, panel);
 
       const contactTab = document.createElement('button'); contactTab.type = 'button'; contactTab.dataset.section = 'contato'; contactTab.textContent = 'Contato'; tabs.append(contactTab);
