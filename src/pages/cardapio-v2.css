@@ -364,19 +364,22 @@ body.is-cardapio-v2.v2-modal-open {
 }
 
 .v2-fulfillment-tab {
-  height: 42px;
+  min-height: 44px;
+  height: auto;
+  padding: 8px 10px;
   border-radius: 6px;
   border: 0;
   background: transparent;
   color: var(--v2-text-muted);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
+  white-space: nowrap;
   transition: all 0.2s ease;
 }
 
@@ -1839,33 +1842,48 @@ body.is-cardapio-v2.v2-modal-open {
   gap: 8px;
 }
 
+.v2-form-grid-2 {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.v2-form-grid-3 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.1fr) 60px;
+  gap: 8px;
+}
+
 .v2-form-row {
   margin-bottom: 12px;
 }
 
 .v2-form-label {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
-  margin-bottom: 4px;
-  color: var(--v2-text-muted);
+  margin-bottom: 5px;
+  color: var(--v2-text);
 }
 
 .v2-form-input {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--v2-border);
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--v2-border);
   border-radius: var(--v2-radius-sm);
   font: inherit;
-  font-size: 13px;
+  font-size: 14.5px;
   background: #ffffff;
   color: var(--v2-text);
   box-sizing: border-box;
   outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .v2-form-input:focus {
   border-color: var(--v2-primary);
+  box-shadow: 0 0 0 3px rgba(184, 68, 21, 0.15);
 }
 
 .v2-quote-summary-box {
@@ -2330,6 +2348,469 @@ body.is-cardapio-v2.v2-modal-open {
 }
 
 /* ==========================================================================
+   Acompanhamento de Pedido em Tempo Real (Live Order Tracker & Stepper)
+   ========================================================================== */
+#v2-confirmation {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 16px 16px 40px;
+}
+
+.v2-tracker-card {
+  background: #ffffff;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-radius-lg);
+  padding: 24px;
+  box-shadow: var(--v2-shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.v2-tracker-header {
+  border-bottom: 1px solid var(--v2-border);
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.v2-tracker-status-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.v2-tracker-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--v2-success-bg);
+  color: var(--v2-success);
+  padding: 6px 12px;
+  border-radius: var(--v2-radius-full);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.v2-tracker-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--v2-success);
+  box-shadow: 0 0 0 0 rgba(21, 128, 61, 0.7);
+  animation: v2-pulse-dot 1.8s infinite;
+}
+
+@keyframes v2-pulse-dot {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(21, 128, 61, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 7px rgba(21, 128, 61, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(21, 128, 61, 0); }
+}
+
+.v2-tracker-order-id {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--v2-text-muted);
+  background: var(--v2-surface-subtle);
+  border: 1px solid var(--v2-border);
+  padding: 4px 10px;
+  border-radius: var(--v2-radius-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.v2-tracker-headline-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.v2-tracker-headline-icon {
+  font-size: 32px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  background: var(--v2-primary-light);
+  border-radius: 14px;
+}
+
+.v2-tracker-headline-title {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 850;
+  color: var(--v2-text);
+  letter-spacing: -0.4px;
+  line-height: 1.25;
+}
+
+.v2-tracker-headline-desc {
+  margin: 0;
+  font-size: 14px;
+  color: var(--v2-text-muted);
+  line-height: 1.45;
+}
+
+.v2-tracker-eta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px 14px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--v2-radius-sm);
+  color: #166534;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+/* Stepper da Esteira (Pipeline) */
+.v2-stepper-wrap {
+  position: relative;
+  margin: 28px 0 32px;
+  padding: 0 8px;
+}
+
+.v2-stepper-track-bg {
+  position: absolute;
+  top: 20px;
+  left: 36px;
+  right: 36px;
+  height: 4px;
+  background: var(--v2-border);
+  border-radius: 2px;
+  z-index: 1;
+}
+
+.v2-stepper-track-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #15803d 0%, var(--v2-primary) 100%);
+  border-radius: 2px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.v2-stepper-nodes {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+}
+
+.v2-stepper-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 72px;
+  transition: all 0.3s ease;
+}
+
+.v2-stepper-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2.5px solid var(--v2-border);
+  color: var(--v2-text-dim);
+  display: grid;
+  place-items: center;
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+
+.v2-stepper-circle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.v2-stepper-node.is-done .v2-stepper-circle {
+  background: #15803d;
+  border-color: #15803d;
+  color: #ffffff;
+}
+
+.v2-stepper-node.is-active .v2-stepper-circle {
+  background: var(--v2-primary);
+  border-color: var(--v2-primary);
+  color: #ffffff;
+  transform: scale(1.12);
+  animation: v2-pulse-ring 2s infinite;
+}
+
+@keyframes v2-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(184, 68, 21, 0.45); }
+  70% { box-shadow: 0 0 0 10px rgba(184, 68, 21, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(184, 68, 21, 0); }
+}
+
+.v2-stepper-title {
+  font-size: 12.5px;
+  font-weight: 750;
+  color: var(--v2-text-dim);
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+
+.v2-stepper-subtitle {
+  font-size: 10.5px;
+  color: var(--v2-text-muted);
+  line-height: 1.2;
+}
+
+.v2-stepper-node.is-done .v2-stepper-title {
+  color: #15803d;
+}
+
+.v2-stepper-node.is-active .v2-stepper-title {
+  color: var(--v2-primary);
+  font-weight: 850;
+}
+
+.v2-tracker-cancelled-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--v2-danger-bg);
+  border: 1px solid #fecaca;
+  border-radius: var(--v2-radius-md);
+  margin: 20px 0;
+  color: var(--v2-danger);
+}
+
+.v2-tracker-cancelled-icon {
+  font-size: 24px;
+}
+
+.v2-tracker-cancelled-text strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 2px;
+}
+
+.v2-tracker-cancelled-text p {
+  margin: 0;
+  font-size: 13px;
+  color: #7f1d1d;
+}
+
+/* WhatsApp Direct Support Card */
+.v2-tracker-wa-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  background: #25D366;
+  color: #ffffff;
+  padding: 14px 18px;
+  border-radius: var(--v2-radius-md);
+  box-shadow: 0 4px 14px rgba(37, 211, 102, 0.3);
+  margin-bottom: 24px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.v2-tracker-wa-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(37, 211, 102, 0.4);
+}
+
+.v2-tracker-wa-icon {
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.v2-tracker-wa-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: #ffffff;
+}
+
+.v2-tracker-wa-body {
+  flex: 1;
+}
+
+.v2-tracker-wa-body strong {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 800;
+}
+
+.v2-tracker-wa-body span {
+  font-size: 12.5px;
+  opacity: 0.92;
+}
+
+.v2-tracker-wa-arrow {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+/* Order Details / Summary */
+.v2-tracker-details {
+  background: var(--v2-surface-subtle);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-radius-md);
+  padding: 18px;
+  margin-bottom: 20px;
+}
+
+.v2-tracker-details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--v2-border);
+  margin-bottom: 14px;
+}
+
+.v2-tracker-details-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--v2-text);
+}
+
+.v2-tracker-modalidade-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.v2-tracker-modalidade-badge.delivery {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.v2-tracker-modalidade-badge.retirada {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.v2-tracker-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.v2-tracker-item-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+}
+
+.v2-tracker-item-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.v2-tracker-item-qty {
+  font-weight: 800;
+  color: var(--v2-primary);
+  min-width: 22px;
+}
+
+.v2-tracker-item-name {
+  color: var(--v2-text);
+  font-weight: 700;
+}
+
+.v2-tracker-item-sub {
+  font-size: 12px;
+  color: var(--v2-text-muted);
+  margin-top: 2px;
+}
+
+.v2-tracker-item-price {
+  font-weight: 800;
+  color: var(--v2-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.v2-tracker-totals {
+  border-top: 1px dashed var(--v2-border);
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.v2-tracker-total-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--v2-text-muted);
+  margin-bottom: 6px;
+}
+
+.v2-tracker-total-line.total {
+  font-size: 17px;
+  font-weight: 850;
+  color: var(--v2-text);
+  border-top: 1px solid var(--v2-border);
+  padding-top: 10px;
+  margin-top: 10px;
+  margin-bottom: 12px;
+}
+
+.v2-tracker-grand-total {
+  color: var(--v2-primary);
+  font-size: 19px;
+}
+
+.v2-tracker-payment-badge {
+  font-size: 12px;
+  color: var(--v2-text-muted);
+  text-align: right;
+  font-weight: 600;
+}
+
+.v2-tracker-btn-reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  background: var(--v2-surface);
+  color: var(--v2-text);
+  border: 1.5px solid var(--v2-border);
+  border-radius: var(--v2-radius-md);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.v2-tracker-btn-reset:hover {
+  background: var(--v2-surface-subtle);
+  border-color: var(--v2-border-hover);
+  color: var(--v2-primary);
+}
+
+/* ==========================================================================
    Responsividade & Mobile Guardrails (Clean & Uncluttered Header)
    ========================================================================== */
 @media (max-width: 768px) {
@@ -2399,6 +2880,120 @@ body.is-cardapio-v2.v2-modal-open {
     font-size: 12px;
     margin-top: 8px;
     gap: 6px 12px;
+  }
+
+  /* Form Grids on Mobile */
+  .v2-form-grid-2 {
+    grid-template-columns: 100px minmax(0, 1fr);
+    gap: 8px;
+  }
+  .v2-form-grid-3 {
+    grid-template-columns: minmax(0, 1fr) 64px;
+    gap: 8px;
+  }
+  .v2-form-row--bairro {
+    grid-column: 1 / -1;
+  }
+  .v2-form-row--cidade {
+    grid-column: 1;
+  }
+  .v2-form-row--uf {
+    grid-column: 2;
+  }
+  .v2-form-input {
+    font-size: 16px; /* Impede zoom indesejado no iOS e Android */
+  }
+
+  /* Product Modal Footer on Mobile (Prevenção de quebra de botão) */
+  .v2-modal-footer {
+    padding: 12px 14px;
+    gap: 8px;
+  }
+  .v2-modal-qty {
+    padding: 2px 4px;
+    gap: 4px;
+  }
+  .v2-modal-qty-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+  .v2-modal-qty-val {
+    font-size: 14px;
+    min-width: 20px;
+  }
+  .v2-modal-submit-btn {
+    padding: 0 12px;
+    font-size: 13.5px;
+    height: 44px;
+    gap: 6px;
+    min-width: 0;
+  }
+  .v2-modal-submit-btn span:first-child {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .v2-modal-submit-btn span:last-child {
+    white-space: nowrap;
+    font-size: 13.5px;
+  }
+
+  /* Fulfillment Selector on Mobile */
+  .v2-fulfillment-selector {
+    margin-top: 14px;
+  }
+  .v2-fulfillment-tab {
+    font-size: 13px;
+    padding: 8px 6px;
+  }
+
+  /* Cart Drawer & Footer on Mobile */
+  .v2-cart-footer {
+    padding: 16px;
+  }
+  .v2-pickup-box,
+  .v2-delivery-box {
+    padding: 14px 12px;
+  }
+
+  /* Order Tracker Mobile */
+  #v2-confirmation {
+    padding: 12px 10px 32px;
+  }
+  .v2-tracker-card {
+    padding: 18px 14px;
+    border-radius: var(--v2-radius-md);
+  }
+  .v2-tracker-headline-title {
+    font-size: 19px;
+  }
+  .v2-stepper-wrap {
+    margin: 20px 0 24px;
+    padding: 0 4px;
+  }
+  .v2-stepper-track-bg {
+    left: 20px;
+    right: 20px;
+    top: 17px;
+  }
+  .v2-stepper-node {
+    width: 64px;
+  }
+  .v2-stepper-circle {
+    width: 34px;
+    height: 34px;
+    border-width: 2px;
+  }
+  .v2-stepper-circle svg {
+    width: 15px;
+    height: 15px;
+  }
+  .v2-stepper-title {
+    font-size: 11px;
+  }
+  .v2-stepper-subtitle {
+    font-size: 9.5px;
   }
 }
 

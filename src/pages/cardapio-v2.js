@@ -1,5 +1,6 @@
 import { catalogoV2, enviarV2, acompanharV2, cotarV2 } from '../lib/v2.js';
 import { esc, brl } from '../lib/format.js';
+import { formatarTelefone, mascaraTelefone } from '../lib/moeda.js';
 import './cardapio-v2.css';
 import { iniciarAcompanhamento } from '../lib/acompanhamento-v2.js';
 import { precoOferta, comporCombo, centavos } from '../../shared/ofertas.js';
@@ -468,11 +469,11 @@ export async function renderCardapioV2(app, atendimento = null) {
         <div class="v2-delivery-legend">${ico.store} Dados para retirada no balcão</div>
         <div class="v2-form-row">
           <label class="v2-form-label" for="v2-pickup-nome">Nome de quem vai retirar *</label>
-          <input id="v2-pickup-nome" class="v2-form-input" name="nome" maxlength="80" autocomplete="name" required placeholder="Ex.: Douglas" value="${esc(pickupData.nome || '')}">
+          <input id="v2-pickup-nome" class="v2-form-input" name="nome" maxlength="60" autocomplete="name" required placeholder="Ex.: Douglas" value="${esc(pickupData.nome || '')}">
         </div>
         <div class="v2-form-row">
           <label class="v2-form-label" for="v2-pickup-tel">WhatsApp com DDD *</label>
-          <input id="v2-pickup-tel" class="v2-form-input" name="telefone" maxlength="25" type="tel" inputmode="tel" autocomplete="tel-national" required placeholder="(11) 99999-9999" value="${esc(pickupData.telefone || '')}">
+          <input id="v2-pickup-tel" class="v2-form-input" name="telefone" maxlength="15" type="tel" inputmode="numeric" autocomplete="tel" required placeholder="(11) 99999-9999" value="${esc(formatarTelefone(pickupData.telefone || ''))}">
         </div>
       </div>
     `;
@@ -486,11 +487,11 @@ export async function renderCardapioV2(app, atendimento = null) {
         <fieldset id="v2-delivery-fields" style="border:0; padding:0; margin:0;" ${pending ? 'disabled' : ''}>
           <div class="v2-form-row">
             <label class="v2-form-label" for="v2-nome">Nome de quem recebe *</label>
-            <input id="v2-nome" class="v2-form-input" name="nome" maxlength="80" autocomplete="name" required placeholder="Seu nome" value="${esc(data.nome || '')}">
+            <input id="v2-nome" class="v2-form-input" name="nome" maxlength="60" autocomplete="name" required placeholder="Seu nome" value="${esc(data.nome || '')}">
           </div>
           <div class="v2-form-row">
             <label class="v2-form-label" for="v2-telefone">WhatsApp com DDD *</label>
-            <input id="v2-telefone" class="v2-form-input" name="telefone" maxlength="25" type="tel" inputmode="tel" autocomplete="tel-national" required placeholder="(11) 99999-9999" value="${esc(data.telefone || '')}">
+            <input id="v2-telefone" class="v2-form-input" name="telefone" maxlength="15" type="tel" inputmode="numeric" autocomplete="tel" required placeholder="(11) 99999-9999" value="${esc(formatarTelefone(data.telefone || ''))}">
           </div>
           <div class="v2-form-row">
             <label class="v2-form-label" for="v2-cep">CEP * <span style="font-size:11px; font-weight:500; color:var(--v2-text-muted);">(busca endereço e frete automáticos)</span></label>
@@ -500,26 +501,26 @@ export async function renderCardapioV2(app, atendimento = null) {
             <label class="v2-form-label" for="v2-logradouro">Rua ou avenida *</label>
             <input id="v2-logradouro" class="v2-form-input" name="logradouro" maxlength="120" autocomplete="address-line1" required placeholder="Nome da rua" value="${esc(data.logradouro || '')}">
           </div>
-          <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 10px;">
+          <div class="v2-form-grid-2">
             <div class="v2-form-row">
               <label class="v2-form-label" for="v2-numero">Número *</label>
-              <input id="v2-numero" class="v2-form-input" name="numero" maxlength="20" required placeholder="Número" value="${esc(data.numero || '')}">
+              <input id="v2-numero" class="v2-form-input" name="numero" maxlength="15" required placeholder="Número" value="${esc(data.numero || '')}">
             </div>
             <div class="v2-form-row">
               <label class="v2-form-label" for="v2-complemento">Complemento (opcional)</label>
-              <input id="v2-complemento" class="v2-form-input" name="complemento" maxlength="120" autocomplete="address-line2" placeholder="Bloco, apto, ref." value="${esc(data.complemento || '')}">
+              <input id="v2-complemento" class="v2-form-input" name="complemento" maxlength="100" autocomplete="address-line2" placeholder="Bloco, apto, ref." value="${esc(data.complemento || '')}">
             </div>
           </div>
-          <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 56px; gap: 8px;">
-            <div class="v2-form-row">
+          <div class="v2-form-grid-3">
+            <div class="v2-form-row v2-form-row--bairro">
               <label class="v2-form-label" for="v2-bairro">Bairro *</label>
               <input id="v2-bairro" class="v2-form-input" name="bairro" maxlength="80" autocomplete="address-level3" required placeholder="Bairro" value="${esc(data.bairro || '')}">
             </div>
-            <div class="v2-form-row">
+            <div class="v2-form-row v2-form-row--cidade">
               <label class="v2-form-label" for="v2-cidade">Cidade *</label>
               <input id="v2-cidade" class="v2-form-input" name="cidade" maxlength="80" autocomplete="address-level2" required placeholder="Cidade" value="${esc(data.cidade || '')}">
             </div>
-            <div class="v2-form-row">
+            <div class="v2-form-row v2-form-row--uf">
               <label class="v2-form-label" for="v2-uf">UF *</label>
               <input id="v2-uf" class="v2-form-input" name="uf" maxlength="2" autocomplete="address-level1" required value="${esc(data.uf || '')}">
             </div>
@@ -793,10 +794,10 @@ export async function renderCardapioV2(app, atendimento = null) {
               ${!mesaId && (temRetirada && temDelivery) ? `
                 <div class="v2-fulfillment-selector">
                   <button type="button" class="v2-fulfillment-tab ${isDelivery ? 'active' : ''}" data-set-sacola-modalidade="delivery">
-                    ${ico.motorcycle} Entrega (Delivery)
+                    ${ico.motorcycle} <span>Entrega</span>
                   </button>
                   <button type="button" class="v2-fulfillment-tab ${!isDelivery ? 'active' : ''}" data-set-sacola-modalidade="retirada">
-                    ${ico.store} Retirada no balcão
+                    ${ico.store} <span>Retirada</span>
                   </button>
                 </div>
               ` : ''}
@@ -1569,9 +1570,16 @@ export async function renderCardapioV2(app, atendimento = null) {
           if (digits.length === 8) {
             consultarViaCep(digits);
           }
-        } else {
+        } else if (e.target.name !== 'telefone') {
           deliveryData[e.target.name] = e.target.value;
         }
+      });
+    }
+
+    const telEntrega = app.querySelector('#v2-telefone');
+    if (telEntrega) {
+      mascaraTelefone(telEntrega, val => {
+        deliveryData.telefone = val;
       });
     }
 
@@ -1583,8 +1591,8 @@ export async function renderCardapioV2(app, atendimento = null) {
       });
     }
     if (pickupTel) {
-      pickupTel.addEventListener('input', () => {
-        pickupData.telefone = pickupTel.value;
+      mascaraTelefone(pickupTel, val => {
+        pickupData.telefone = val;
       });
     }
 
@@ -1599,24 +1607,28 @@ export async function renderCardapioV2(app, atendimento = null) {
           }
           const isDelivery = modalidadeSacola === 'delivery';
           if (!isDelivery) {
-            if (!pickupData.nome?.trim()) {
+            const nome = (pickupData.nome || '').trim();
+            if (nome.length < 2) {
               showToast('Por favor, informe seu nome para a retirada.', 'error');
               app.querySelector('#v2-pickup-nome')?.focus();
               return;
             }
-            if (!pickupData.telefone?.trim()) {
-              showToast('Por favor, informe seu WhatsApp com DDD.', 'error');
+            const telDigits = String(pickupData.telefone || '').replace(/\D/g, '');
+            if (telDigits.length < 10 || telDigits.length > 11) {
+              showToast('Por favor, informe um WhatsApp válido com DDD (Ex.: 11 99999-9999).', 'error');
               app.querySelector('#v2-pickup-tel')?.focus();
               return;
             }
           } else {
-            if (!deliveryData.nome?.trim()) {
+            const nome = (deliveryData.nome || '').trim();
+            if (nome.length < 2) {
               showToast('Por favor, informe seu nome para entrega.', 'error');
               app.querySelector('#v2-nome')?.focus();
               return;
             }
-            if (!deliveryData.telefone?.trim()) {
-              showToast('Por favor, informe seu WhatsApp com DDD.', 'error');
+            const telDigits = String(deliveryData.telefone || '').replace(/\D/g, '');
+            if (telDigits.length < 10 || telDigits.length > 11) {
+              showToast('Por favor, informe um WhatsApp válido com DDD (Ex.: 11 99999-9999).', 'error');
               app.querySelector('#v2-telefone')?.focus();
               return;
             }
@@ -1673,61 +1685,202 @@ export async function renderCardapioV2(app, atendimento = null) {
   }
 
   function showOrder(order) {
-    const labels = {
-      novo: 'Recebido pela cozinha',
-      em_preparo: 'Sendo preparado',
-      pronto: 'Pronto para entrega/retirada',
-      saiu_entrega: 'Saiu com o entregador',
-      entregue: 'Entregue com sucesso',
-      cancelado: 'Cancelado'
-    };
+    const isDelivery = order.tipo === 'delivery';
+    const isCancelado = order.status === 'cancelado';
+    
+    // Configuração dos 4 passos da esteira
+    const steps = isDelivery ? [
+      { key: 'novo', title: 'Recebido', subtitle: 'Pela cozinha', icon: ico.checkCircle },
+      { key: 'em_preparo', title: 'Na Cozinha', subtitle: 'Em preparo', icon: ico.food },
+      { key: 'saiu_entrega', title: 'A Caminho', subtitle: 'Com motoboy', icon: ico.motorcycle },
+      { key: 'entregue', title: 'Entregue', subtitle: 'Concluído', icon: ico.check }
+    ] : [
+      { key: 'novo', title: 'Recebido', subtitle: 'Pela cozinha', icon: ico.checkCircle },
+      { key: 'em_preparo', title: 'Na Cozinha', subtitle: 'Em preparo', icon: ico.food },
+      { key: 'pronto', title: 'No Balcão', subtitle: 'Pronto p/ retirar', icon: ico.store },
+      { key: 'entregue', title: 'Entregue', subtitle: 'Concluído', icon: ico.check }
+    ];
+
+    let activeStepIdx = 0;
+    if (order.status === 'em_preparo') {
+      activeStepIdx = 1;
+    } else if (order.status === 'pronto') {
+      activeStepIdx = 2;
+    } else if (order.status === 'saiu_entrega') {
+      activeStepIdx = 2;
+    } else if (order.status === 'entregue') {
+      activeStepIdx = 3;
+    }
+
+    const progressPercent = activeStepIdx === 0 ? 12 : activeStepIdx === 1 ? 40 : activeStepIdx === 2 ? 72 : 100;
+
+    let headlineTitle = 'Pedido Recebido!';
+    let headlineDesc = 'A cozinha já recebeu seu pedido e vai iniciar o preparo em instantes.';
+    let headlineIcon = '👨‍🍳';
+
+    if (order.status === 'em_preparo') {
+      headlineTitle = 'Seu pedido está na cozinha!';
+      headlineDesc = 'O restaurante está preparando tudo com todo o carinho e cuidado.';
+      headlineIcon = '🔥';
+    } else if (order.status === 'pronto') {
+      if (isDelivery) {
+        headlineTitle = 'Pedido embalado e pronto!';
+        headlineDesc = 'Finalizado na cozinha e aguardando a saída com o entregador.';
+        headlineIcon = '📦';
+      } else {
+        headlineTitle = 'Pronto para Retirada no Balcão!';
+        headlineDesc = 'Seu pedido já está quentinho te esperando na loja. Pode vir retirar!';
+        headlineIcon = '🛍️';
+      }
+    } else if (order.status === 'saiu_entrega') {
+      headlineTitle = 'Saiu para Entrega!';
+      headlineDesc = 'O entregador já está a caminho com seu pedido. Fique de olho na campainha ou interfone!';
+      headlineIcon = '🛵';
+    } else if (order.status === 'entregue') {
+      headlineTitle = 'Pedido Entregue com Sucesso!';
+      headlineDesc = 'Aproveite a sua refeição e bom apetite! Obrigado pela preferência.';
+      headlineIcon = '🎉';
+    } else if (isCancelado) {
+      headlineTitle = 'Pedido Cancelado';
+      headlineDesc = 'Este pedido foi cancelado pelo estabelecimento. Fale conosco no botão abaixo.';
+      headlineIcon = '❌';
+    }
+
+    const telRaw = catalog?.whatsapp || catalog?.telefone || catalog?.contato?.telefone;
+    const telDigitos = String(telRaw || '').replace(/\D/g, '');
+    const waMsg = encodeURIComponent(`Olá! Fiz o pedido #${order.pedidoId.slice(-6).toUpperCase()} no cardápio digital e gostaria de acompanhar.`);
+    const waLink = telDigitos.length >= 10 ? `https://wa.me/55${telDigitos}?text=${waMsg}` : '';
+
     const panel = app.querySelector('#v2-confirmation');
     if (!panel) return;
 
     panel.innerHTML = `
-      <section style="background:#ffffff; border:1px solid var(--v2-border); border-radius:var(--v2-radius-md); padding:24px; margin:24px; box-shadow:var(--v2-shadow-md);">
-        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-          <span style="width:28px; height:28px; color:var(--v2-primary); display:flex; align-items:center; justify-content:center;">${ico.bag}</span>
-          <div>
-            <h2 style="margin:0; font-size:20px; font-weight:800;">${esc(labels[order.status] || order.status)}</h2>
-            <small style="color:var(--v2-text-muted);">Pedido #${esc(order.pedidoId.slice(-6).toUpperCase())}</small>
-          </div>
-        </div>
-        <div style="border-top:1px dashed var(--v2-border); padding-top:14px; margin-top:14px;">
-          ${order.itens.map(line => `
-            <div style="display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:6px;">
-              <span>${line.quantidade}× ${esc(line.nome)}</span>
-              <strong>${money(line.totalCentavos)}</strong>
+      <section class="v2-tracker-card">
+        <!-- Cabeçalho de Status em Tempo Real -->
+        <div class="v2-tracker-header">
+          <div class="v2-tracker-status-top">
+            <div class="v2-tracker-live-pill">
+              <span class="v2-tracker-live-dot"></span>
+              <span id="v2-tracking-state">Acompanhamento em tempo real</span>
             </div>
-          `).join('')}
-          ${order.tipo === 'delivery' ? `
-            <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--v2-text-muted); margin-top:8px;">
-              <span>Taxa de entrega</span>
-              <span>${money(order.taxaEntregaCentavos)}</span>
+            <span class="v2-tracker-order-id">#${esc(order.pedidoId.slice(-6).toUpperCase())}</span>
+          </div>
+
+          <div class="v2-tracker-headline-box">
+            <div class="v2-tracker-headline-icon">${headlineIcon}</div>
+            <div>
+              <h2 class="v2-tracker-headline-title">${headlineTitle}</h2>
+              <p class="v2-tracker-headline-desc">${headlineDesc}</p>
+            </div>
+          </div>
+
+          ${isDelivery && order.prazoMinutos ? `
+            <div class="v2-tracker-eta-badge">
+              ${ico.clock}
+              <span>Previsão de entrega: <strong>~${order.prazoMinutos} minutos</strong></span>
             </div>
           ` : ''}
-          <div style="display:flex; justify-content:space-between; font-size:16px; font-weight:850; border-top:1px solid var(--v2-border); padding-top:10px; margin-top:10px;">
-            <span>Total</span>
-            <span style="color:var(--v2-primary);">${money(order.totalCentavos)}</span>
+        </div>
+
+        <!-- Esteira Visual com 4 Etapas (Pipeline) -->
+        ${isCancelado ? `
+          <div class="v2-tracker-cancelled-box">
+            <div class="v2-tracker-cancelled-icon">⚠️</div>
+            <div class="v2-tracker-cancelled-text">
+              <strong>Atenção: Pedido Cancelado</strong>
+              <p>O restaurante precisou cancelar este pedido. Por favor, chame no WhatsApp para esclarecimentos.</p>
+            </div>
+          </div>
+        ` : `
+          <div class="v2-stepper-wrap">
+            <div class="v2-stepper-track-bg">
+              <div class="v2-stepper-track-fill" style="width: ${progressPercent}%;"></div>
+            </div>
+            <div class="v2-stepper-nodes">
+              ${steps.map((st, idx) => `
+                <div class="v2-stepper-node ${idx < activeStepIdx ? 'is-done' : ''} ${idx === activeStepIdx ? 'is-active' : ''}">
+                  <div class="v2-stepper-circle">
+                    ${idx < activeStepIdx ? ico.check : st.icon}
+                  </div>
+                  <span class="v2-stepper-title">${st.title}</span>
+                  <span class="v2-stepper-subtitle">${st.subtitle}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `}
+
+        <!-- Botão Direto para Falar com o Restaurante via WhatsApp -->
+        ${waLink ? `
+          <a href="${waLink}" target="_blank" rel="noopener" class="v2-tracker-wa-card">
+            <div class="v2-tracker-wa-icon">${ico.wa}</div>
+            <div class="v2-tracker-wa-body">
+              <strong>Falar com o Restaurante</strong>
+              <span>Tirar dúvidas ou acompanhar pelo WhatsApp</span>
+            </div>
+            <span class="v2-tracker-wa-arrow">→</span>
+          </a>
+        ` : ''}
+
+        <!-- Detalhes e Resumo do Pedido -->
+        <div class="v2-tracker-details">
+          <div class="v2-tracker-details-header">
+            <div class="v2-tracker-details-title">
+              ${ico.orders} <span>Itens do Pedido</span>
+            </div>
+            <span class="v2-tracker-modalidade-badge ${isDelivery ? 'delivery' : 'retirada'}">
+              ${isDelivery ? `${ico.motorcycle} Entrega` : `${ico.store} Retirada no balcão`}
+            </span>
+          </div>
+
+          <div class="v2-tracker-items-list">
+            ${order.itens.map(line => `
+              <div class="v2-tracker-item-row">
+                <div class="v2-tracker-item-info">
+                  <span class="v2-tracker-item-qty">${line.quantidade}×</span>
+                  <div>
+                    <strong class="v2-tracker-item-name">${esc(line.nome)}</strong>
+                    ${line.opcoes?.length ? `
+                      <div class="v2-tracker-item-sub">
+                        ${line.opcoes.map(o => esc(o.nome)).join(', ')}
+                      </div>
+                    ` : ''}
+                    ${line.componentes?.length ? `
+                      <div class="v2-tracker-item-sub">
+                        ${line.componentes.map(c => esc(c.nome)).join(' + ')}
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+                <span class="v2-tracker-item-price">${money(line.totalCentavos)}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="v2-tracker-totals">
+            ${isDelivery ? `
+              <div class="v2-tracker-total-line">
+                <span>Subtotal dos itens</span>
+                <span>${money(order.subtotalCentavos || (order.totalCentavos - (order.taxaEntregaCentavos || 0)))}</span>
+              </div>
+              <div class="v2-tracker-total-line">
+                <span>Taxa de entrega</span>
+                <span>${order.taxaEntregaCentavos ? money(order.taxaEntregaCentavos) : 'Grátis'}</span>
+              </div>
+            ` : ''}
+            <div class="v2-tracker-total-line total">
+              <span>Total</span>
+              <span class="v2-tracker-grand-total">${money(order.totalCentavos)}</span>
+            </div>
+            <div class="v2-tracker-payment-badge">
+              ${order.pagamento === 'pago' ? '✅ Pagamento Confirmado' : '💳 Pagamento na Entrega / Retirada'}
+            </div>
           </div>
         </div>
-        <p id="v2-tracking-state" style="font-size:12.5px; color:var(--v2-text-muted); margin:14px 0 0;">
-          Acompanhando situação do pedido em tempo real…
-        </p>
-        ${(() => {
-          const telRaw = catalog?.whatsapp || catalog?.telefone || catalog?.contato?.telefone;
-          const telDigitos = String(telRaw || '').replace(/\D/g, '');
-          if (telDigitos.length < 10) return '';
-          const msg = encodeURIComponent(`Olá! Fiz o pedido #${order.pedidoId.slice(-6).toUpperCase()} no cardápio digital.`);
-          return `
-            <a href="https://wa.me/55${telDigitos}?text=${msg}" target="_blank" rel="noopener" style="display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; margin-top:14px; padding:12px 16px; border-radius:var(--v2-radius-md); background:#25D366; color:#ffffff; font-weight:700; font-size:14px; box-shadow:0 2px 8px rgba(37,211,102,0.25);">
-              <span style="display:inline-flex; width:20px; height:20px;">${ico.wa}</span>
-              <span>Avisar no WhatsApp do restaurante</span>
-            </a>
-          `;
-        })()}
-        <button type="button" id="v2-new" class="v2-cart-submit-btn" style="margin-top:14px; justify-content:center; width:100%; background:var(--v2-surface-alt); color:var(--v2-text); border:1px solid var(--v2-border);">
-          Fazer outro pedido
+
+        <!-- Botão Novo Pedido -->
+        <button type="button" id="v2-new" class="v2-tracker-btn-reset">
+          ${ico.bag} <span>Fazer outro pedido</span>
         </button>
       </section>
     `;
