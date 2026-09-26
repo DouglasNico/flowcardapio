@@ -31,7 +31,7 @@
 .gestao-v2 .g-delivery h3{font-size:18px;margin:0 0 10px}
 .gestao-v2 .g-delivery p{font-size:13px;line-height:1.6;color:var(--slate)}
 .gestao-v2 .g-delivery .g-region{border-top:1px solid var(--line);padding:20px 0;margin-top:24px}
-.gestao-v2 .g-delivery-pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.gestao-v2 .g-delivery-pair{display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:16px}
 .gestao-v2 .g-remove-region{justify-self:start}
 @media(max-width:600px){.gestao-v2 .g-delivery-pair{grid-template-columns:1fr}.gestao-v2 .g-tabs button{padding:10px 14px}}
 .gestao-v2 .g-schedule-fields[hidden]{display:none}

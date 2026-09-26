@@ -252,7 +252,36 @@ export async function renderGestaoV2(app) {
     (async () => {
       try {
         const res = await s.call('listarMinhasLojasV2', {});
-        const lojas = res?.lojas || [];
+        let lojas = res?.lojas || [];
+        if (lojas.length === 0 && s.db && user?.uid) {
+          try {
+            const { doc, getDoc, collection, query, where, getDocs } = await import('firebase/firestore');
+            const uLojistaSnap = await getDoc(doc(s.db, 'usuarios_lojistas', user.uid)).catch(() => null);
+            if (uLojistaSnap && uLojistaSnap.exists()) {
+              const uData = uLojistaSnap.data();
+              lojas.push({
+                lojaId: uData.lojaId,
+                slug: (uData.lojaId || '').replace(/^legado-/, ''),
+                nome: uData.nome || 'Minha Loja',
+                papel: 'gerente'
+              });
+            } else if (user.email) {
+              const q = query(collection(s.db, 'lojas_v2'), where('emailAcesso', '==', user.email.toLowerCase().trim()));
+              const snap = await getDocs(q).catch(() => null);
+              if (snap && !snap.empty) {
+                snap.forEach(d => {
+                  const sData = d.data();
+                  lojas.push({
+                    lojaId: d.id,
+                    slug: sData.slug || d.id.replace(/^legado-/, ''),
+                    nome: sData.nome || 'Minha Loja',
+                    papel: 'gerente'
+                  });
+                });
+              }
+            }
+          } catch (_) {}
+        }
         const box = content.querySelector('#g-minhas-lojas-box');
         const grid = content.querySelector('#g-lojas-grid');
         const count = content.querySelector('#g-lojas-count');
