@@ -245,7 +245,7 @@ export async function renderGestaoV2(app) {
 
     const storeCard = content.querySelector('#g-store-card'), storeForm = content.querySelector('#g-store'), createForm = content.querySelector('#g-create-store'), catalog = content.querySelector('#g-catalog');
     const btnNovaLoja = content.querySelector('#g-btn-nova-loja'), btnVoltarLoja = content.querySelector('#g-btn-voltar-loja'), createResult = createForm.querySelector('.g-result');
-    let data, lojaId, uncertain = false, busy = false, activeTab = 'catalogo', categoriaFiltro = '', lojaDraft = null, productDraft = null, deliveryDraft = null, mesaDraft = null, addonDraft = null, contatoDraft = null;
+    let data, lojaId, uncertain = false, busy = false, activeTab = 'pedidos', categoriaFiltro = '', lojaDraft = null, productDraft = null, deliveryDraft = null, mesaDraft = null, addonDraft = null, contatoDraft = null;
     draftGuard = protegerRascunhosGestao(content, () => busy);
 
     // Carrega lojas já vinculadas ao usuário
@@ -706,13 +706,20 @@ export async function renderGestaoV2(app) {
         edit(newProduct);
       };
 
-      // Abas de Seções
+      // Abas de Seções (Pedidos em 1º lugar na esteira operacional!)
       const temMesas = data.modulos?.mesas !== false || data.modulos?.comandas !== false;
       const tabs = document.createElement('nav'); tabs.className = 'g-tabs'; tabs.setAttribute('aria-label', 'Seções da gestão');
-      tabs.innerHTML = `<button type="button" data-section="catalogo">Catálogo</button><button type="button" data-section="loja">Loja</button><button type="button" data-section="delivery">Delivery</button>${temMesas ? '<button type="button" data-section="mesas">Mesas e QR</button>' : ''}`;
+      tabs.innerHTML = `
+        <button type="button" data-section="pedidos">Pedidos</button>
+        <button type="button" data-section="catalogo">Catálogo</button>
+        <button type="button" data-section="delivery">Delivery</button>
+        <button type="button" data-section="loja">Loja</button>
+        <button type="button" data-section="adicionais">Adicionais</button>
+        ${temMesas ? '<button type="button" data-section="mesas">Mesas e QR</button>' : ''}
+        <button type="button" data-section="contato">Contato</button>
+      `;
       catalog.insertBefore(tabs, panel);
 
-      const contactTab = document.createElement('button'); contactTab.type = 'button'; contactTab.dataset.section = 'contato'; contactTab.textContent = 'Contato'; tabs.append(contactTab);
       const contactPanel = document.createElement('section'); contactPanel.id = 'g-panel-contato'; catalog.append(contactPanel);
       renderContatoGestao(contactPanel, contatoDraft || { versao: data.versao, contato: data.contato || {} }, draft => { contatoDraft = draft; }, async (payload, result) => {
         if (busy || uncertain) return;
@@ -732,7 +739,6 @@ export async function renderGestaoV2(app) {
         }
       });
 
-      const addonTab = document.createElement('button'); addonTab.type = 'button'; addonTab.dataset.section = 'adicionais'; addonTab.textContent = 'Adicionais'; tabs.append(addonTab);
       const addonPanel = document.createElement('section'); addonPanel.id = 'g-panel-adicionais'; catalog.append(addonPanel);
       renderAdicionaisGestao(addonPanel, data, addonDraft, draft => { addonDraft = draft; }, async (payload, result) => {
         if (busy || uncertain) return;
@@ -752,7 +758,6 @@ export async function renderGestaoV2(app) {
         }
       });
 
-      const ordersTab = document.createElement('button'); ordersTab.type = 'button'; ordersTab.dataset.section = 'pedidos'; ordersTab.textContent = 'Pedidos'; tabs.append(ordersTab);
       const ordersPanel = document.createElement('section'); ordersPanel.id = 'g-panel-pedidos'; catalog.append(ordersPanel);
       const orders = renderPedidosGestao(ordersPanel, {
         read: apos => s.call('listarPedidosGestaoV2', { lojaId, ...(apos ? { apos } : {}) }),
@@ -904,7 +909,7 @@ export async function renderGestaoV2(app) {
         tabs.querySelectorAll('button').forEach(button => button.setAttribute('aria-current', button.dataset.section === tab ? 'page' : 'false'));
       };
 
-      const navIcons = { catalogo: ico.bag, loja: ico.store, delivery: ico.bag, mesas: ico.qr, contato: ico.store, adicionais: ico.bag, pedidos: ico.orders };
+      const navIcons = { pedidos: ico.orders, catalogo: ico.bag, delivery: ico.delivery || ico.motorcycle || ico.bag, loja: ico.store, adicionais: ico.plus || ico.bag, mesas: ico.qr, contato: ico.wa || ico.store };
       for (const button of tabs.querySelectorAll('button')) { const label = button.textContent; button.innerHTML = `${navIcons[button.dataset.section] || ico.store}<span>${esc(label)}</span>`; }
       sidebar.querySelector('.g-side-nav').replaceChildren(tabs);
       tabs.onclick = event => { const button = event.target.closest('[data-section]'); if (!button || busy) return; switchTab(button.dataset.section); window.scrollTo({ top: 0, behavior: 'instant' }); };

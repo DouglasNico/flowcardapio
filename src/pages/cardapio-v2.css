@@ -2568,6 +2568,35 @@ body.is-cardapio-v2.v2-modal-open {
   color: #15803d;
 }
 
+/* Quando o status for 'entregue', TODOS os passos e títulos ficam verdes comemorativos */
+.v2-tracker-card.is-delivered .v2-stepper-track-fill {
+  background: #15803d !important;
+  width: 100% !important;
+}
+
+.v2-tracker-card.is-delivered .v2-stepper-node .v2-stepper-circle,
+.v2-stepper-node.is-delivered .v2-stepper-circle {
+  background: #15803d !important;
+  border-color: #15803d !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(21, 128, 61, 0.3) !important;
+  animation: none !important;
+}
+
+.v2-tracker-card.is-delivered .v2-stepper-node .v2-stepper-title,
+.v2-stepper-node.is-delivered .v2-stepper-title {
+  color: #15803d !important;
+  font-weight: 850 !important;
+}
+
+.v2-tracker-card.is-delivered .v2-tracker-headline-title {
+  color: #15803d !important;
+}
+
+.v2-tracker-card.is-delivered .v2-tracker-headline-icon {
+  background: #dcfce7 !important;
+}
+
 .v2-stepper-node.is-active .v2-stepper-title {
   color: var(--v2-primary);
   font-weight: 850;

@@ -1755,13 +1755,13 @@ export async function renderCardapioV2(app, atendimento = null) {
     if (!panel) return;
 
     panel.innerHTML = `
-      <section class="v2-tracker-card">
+      <section class="v2-tracker-card ${order.status === 'entregue' ? 'is-delivered' : ''}">
         <!-- Cabeçalho de Status em Tempo Real -->
         <div class="v2-tracker-header">
           <div class="v2-tracker-status-top">
             <div class="v2-tracker-live-pill">
               <span class="v2-tracker-live-dot"></span>
-              <span id="v2-tracking-state">Acompanhamento em tempo real</span>
+              <span id="v2-tracking-state">${order.status === 'entregue' ? 'Pedido Entregue!' : 'Acompanhamento em tempo real'}</span>
             </div>
             <span class="v2-tracker-order-id">#${esc(order.pedidoId.slice(-6).toUpperCase())}</span>
           </div>
@@ -1774,7 +1774,7 @@ export async function renderCardapioV2(app, atendimento = null) {
             </div>
           </div>
 
-          ${isDelivery && order.prazoMinutos ? `
+          ${isDelivery && order.prazoMinutos && order.status !== 'entregue' ? `
             <div class="v2-tracker-eta-badge">
               ${ico.clock}
               <span>Previsão de entrega: <strong>~${order.prazoMinutos} minutos</strong></span>
@@ -1797,15 +1797,19 @@ export async function renderCardapioV2(app, atendimento = null) {
               <div class="v2-stepper-track-fill" style="width: ${progressPercent}%;"></div>
             </div>
             <div class="v2-stepper-nodes">
-              ${steps.map((st, idx) => `
-                <div class="v2-stepper-node ${idx < activeStepIdx ? 'is-done' : ''} ${idx === activeStepIdx ? 'is-active' : ''}">
+              ${steps.map((st, idx) => {
+                const isDelivered = order.status === 'entregue';
+                const isDone = isDelivered || idx < activeStepIdx;
+                const isActive = !isDelivered && idx === activeStepIdx;
+                return `
+                <div class="v2-stepper-node ${isDone ? 'is-done' : ''} ${isActive ? 'is-active' : ''} ${isDelivered ? 'is-delivered' : ''}">
                   <div class="v2-stepper-circle">
-                    ${idx < activeStepIdx ? ico.check : st.icon}
+                    ${isDone ? ico.check : st.icon}
                   </div>
                   <span class="v2-stepper-title">${st.title}</span>
                   <span class="v2-stepper-subtitle">${st.subtitle}</span>
                 </div>
-              `).join('')}
+              `;}).join('')}
             </div>
           </div>
         `}

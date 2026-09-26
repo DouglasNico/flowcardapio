@@ -1,3 +1,5 @@
+import { formatarTelefone } from '../lib/moeda.js';
+
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = value => Number.isSafeInteger(value) ? (value / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Não informado';
 const states = {
@@ -320,15 +322,54 @@ export function renderPedidosGestao(host, options, valid) {
       const statusClass = `g-status-${order.status || 'novo'}`;
 
       let contatoHtml = '';
-      if (order.contato?.nome || order.contato?.telefone) {
-        const tel = (order.contato.telefone || '').replace(/\D/g, '');
-        const zapLink = tel ? `<a href="https://wa.me/55${tel}" target="_blank" rel="noopener" style="color:#0284c7; font-weight:600; text-decoration:none;">📱 WhatsApp: ${esc(order.contato.telefone)}</a>` : '';
-        const endTxt = order.entrega?.endereco ? `<div style="font-size:12px; color:#475569; margin-top:2px;">📍 ${esc(order.entrega.endereco.logradouro)}, ${esc(order.entrega.endereco.numero)} - ${esc(order.entrega.endereco.bairro)}</div>` : '';
+      const clienteNome = order.contato?.nome || order.entrega?.nome || '';
+      const clienteTel = order.contato?.telefone || order.entrega?.telefone || '';
+      const telDigitos = String(clienteTel).replace(/\D/g, '');
+      const telFormatado = formatarTelefone(telDigitos);
+      const end = order.entrega?.endereco || order.entrega;
+
+      if (clienteNome || clienteTel || end?.logradouro || order.tipo === 'retirada') {
+        const zapBtn = telDigitos.length >= 10 ? `
+          <a href="https://wa.me/55${telDigitos}" target="_blank" rel="noopener" class="g-order-zap-btn">
+            <span>💬 Chamar no WhatsApp (${esc(telFormatado || clienteTel)})</span>
+          </a>
+        ` : (clienteTel ? `<span style="font-size:13px; color:#475569; font-weight:600;">📞 Tel: ${esc(clienteTel)}</span>` : '');
+
+        let endHtml = '';
+        if (end?.logradouro) {
+          const compl = end.complemento ? ` (${esc(end.complemento)})` : '';
+          const cepTxt = end.cep ? ` · CEP ${esc(end.cep)}` : '';
+          const endCompleto = `${end.logradouro}, ${end.numero || 'S/N'}${compl} - ${end.bairro || ''}, ${end.cidade || ''}/${end.uf || ''}`;
+          const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(`${end.logradouro}, ${end.numero || ''}, ${end.bairro || ''}, ${end.cidade || ''} - ${end.uf || ''}`)}`;
+          endHtml = `
+            <div class="g-order-address-box">
+              <div class="g-order-address-header">
+                <strong>📍 Endereço de Entrega:</strong>
+                <a href="${mapsUrl}" target="_blank" rel="noopener" class="g-order-maps-link">Abrir no Maps ↗</a>
+              </div>
+              <div class="g-order-address-text">${esc(endCompleto)}${esc(cepTxt)}</div>
+              ${order.taxaEntregaCentavos ? `<div class="g-order-delivery-meta">🛵 Taxa de entrega: <strong>${money(order.taxaEntregaCentavos)}</strong> ${order.prazoMinutos ? `· Previsão: ~${order.prazoMinutos} min` : ''}</div>` : ''}
+            </div>
+          `;
+        } else if (order.tipo === 'retirada') {
+          endHtml = `
+            <div class="g-order-pickup-pill">
+              <span>🏬 Retirada no balcão da loja pelo cliente</span>
+            </div>
+          `;
+        }
+
         contatoHtml = `
-          <div class="g-order-customer" style="background:#f8fafc; padding:10px 12px; border-radius:8px; margin:8px 0;">
-            <div style="font-size:13px; font-weight:700; color:var(--navy);">Cliente: ${esc(order.contato.nome || 'Não informado')}</div>
-            ${zapLink ? `<div>${zapLink}</div>` : ''}
-            ${endTxt}
+          <div class="g-order-customer-card">
+            <div class="g-order-customer-header">
+              <div class="g-order-customer-name">
+                <span style="font-size:15px;">👤</span>
+                <strong>Cliente: ${esc(clienteNome || 'Não informado')}</strong>
+              </div>
+              ${order.tipo === 'delivery' ? '<span class="g-pill-delivery">Delivery</span>' : '<span class="g-pill-pickup">Retirada</span>'}
+            </div>
+            ${zapBtn ? `<div style="margin-top:6px;">${zapBtn}</div>` : ''}
+            ${endHtml}
           </div>
         `;
       }
@@ -464,27 +505,32 @@ export function renderPedidosGestao(host, options, valid) {
 
   async function mudarStatus(order, novoStatus, btnTrigger, novoPagamento = null) {
     if (!updateStatus) return;
-    const oldText = btnTrigger.textContent;
-    btnTrigger.disabled = true;
-    btnTrigger.textContent = 'Salvando…';
+    const oldStatus = order.status;
+    const oldPagamento = order.pagamento;
+
+    // Atualização otimista imediata na interface (0ms de atraso)
+    order.status = novoStatus;
+    if (novoPagamento) order.pagamento = novoPagamento;
+    updateBadges();
+    renderOrdersView();
+
+    // Auto-impressão se habilitada
+    if (novoStatus === 'em_preparo') {
+      const autoCheck = host.querySelector('#g-autoprint-check');
+      if (autoCheck?.checked) {
+        imprimirComandaPedido(order, storeName);
+      }
+    }
+
     try {
       await updateStatus(order.id, novoStatus, novoPagamento);
-      order.status = novoStatus;
-      if (novoPagamento) order.pagamento = novoPagamento;
+    } catch (err) {
+      // Reverte em caso de falha de conexão ou erro do servidor
+      order.status = oldStatus;
+      order.pagamento = oldPagamento;
       updateBadges();
       renderOrdersView();
-
-      // Auto-impressão se habilitada
-      if (novoStatus === 'em_preparo') {
-        const autoCheck = host.querySelector('#g-autoprint-check');
-        if (autoCheck?.checked) {
-          imprimirComandaPedido(order, storeName);
-        }
-      }
-    } catch (err) {
-      alert(err.message || 'Não foi possível alterar o status.');
-      btnTrigger.disabled = false;
-      btnTrigger.textContent = oldText;
+      alert(err.message || 'Não foi possível alterar o status no servidor.');
     }
   }
 
@@ -495,7 +541,7 @@ export function renderPedidosGestao(host, options, valid) {
     if (alive() && !document.hidden && loaded) {
       load(true, true);
     }
-  }, 15000);
+  }, 5000);
 
   return {
     show: () => {

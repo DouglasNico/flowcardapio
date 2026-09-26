@@ -1,4 +1,4 @@
-export const INTERVALO_ACOMPANHAMENTO_MS = 10_000;
+export const INTERVALO_ACOMPANHAMENTO_MS = 4_000;
 
 // Uma consulta por vez; abas ocultas nao mantem timers nem fazem consultas.
 export function iniciarAcompanhamento({ consultar, atualizar, erro, documento = document,
