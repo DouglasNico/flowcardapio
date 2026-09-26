@@ -7,6 +7,9 @@ import { renderAdicionaisGestao } from './gestao-adicionais-v2.js';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
 import { mascaraMoeda, formatarBRL, mascaraTelefone } from '../lib/moeda.js';
 import { ambienteGestaoV2 } from '../lib/gestao-v2.js';
+import { htmlFoto } from '../lib/foto.js';
+import '../lib/foto.css';
+import './painel-foto.css';
 import './painel-catalogo.css';
 import './gestao-v2.css';
 import { renderDeliveryGestao } from './gestao-delivery-v2.js';
@@ -81,7 +84,7 @@ export async function renderGestaoV2(app) {
               </button>
             </form>
 
-            <form id="g-register" class="g-store-form" hidden>
+            <form id="g-register" class="g-store-form" hidden style="display: none;">
               <div class="g-field-group">
                 <label for="g-reg-nome">Nome do Gerente / Estabelecimento</label>
                 <input id="g-reg-nome" name="nome" type="text" placeholder="Ex: Hamburgueria Silva" required maxlength="80">
@@ -112,14 +115,18 @@ export async function renderGestaoV2(app) {
         tabLogin.classList.add('is-active');
         tabReg.classList.remove('is-active');
         formLogin.hidden = false;
+        formLogin.style.display = 'flex';
         formReg.hidden = true;
+        formReg.style.display = 'none';
         say('');
       };
       tabReg.onclick = () => {
         tabReg.classList.add('is-active');
         tabLogin.classList.remove('is-active');
         formReg.hidden = false;
+        formReg.style.display = 'flex';
         formLogin.hidden = true;
+        formLogin.style.display = 'none';
         say('');
       };
 
@@ -889,7 +896,7 @@ export async function renderGestaoV2(app) {
 
           card.innerHTML = `
             <div class="g-prod-media">
-              ${p.imagemUrl ? `<img src="${esc(p.imagemUrl)}" alt="${esc(p.nome)}" class="g-prod-img" loading="lazy">` : `<div class="g-prod-ph">${ico.burger}</div>`}
+              ${p.imagemUrl ? htmlFoto({ fotoUrl: p.imagemUrl, fotoEnquadramento: p.fotoEnquadramento }) : `<div class="g-prod-ph">${ico.burger}</div>`}
               ${isCombo ? `<span class="g-prod-badge-combo">COMBO</span>` : ''}
             </div>
             <div class="g-prod-info">
@@ -905,7 +912,7 @@ export async function renderGestaoV2(app) {
                 <div class="g-prod-footer-main">
                   <div>
                     <span class="g-prod-price">${formatarBRL(p.precoCentavos)}</span>
-                    ${isCombo ? `<span class="g-combo-price">+ Combo por ${formatarBRL(p.combo.preco)}</span>` : ''}
+                    ${isCombo ? `<span class="g-combo-price">+ Combo por ${formatarBRL(p.combo?.preco < 100 ? p.combo.preco * 100 : p.combo.preco)}</span>` : ''}
                   </div>
                   <button type="button" class="g-btn-card-options" data-act="options" title="Gerenciar ponto da carne, molhos e adicionais">
                     ⚙️ Opções ${gruposCount > 0 ? `<span class="g-opt-chip">${gruposCount}</span>` : ''}
@@ -992,7 +999,20 @@ export async function renderGestaoV2(app) {
       function edit(p, version = data.versao) {
         const productVersion = version;
         let precoCentavosAtual = p.precoCentavos || 0;
-        let comboPrecoCentavosAtual = p.combo?.preco || (precoCentavosAtual ? precoCentavosAtual + 1000 : 2500);
+        let rawComboPreco = p.combo?.preco;
+        if (rawComboPreco && rawComboPreco < 100) rawComboPreco = rawComboPreco * 100;
+        let comboPrecoCentavosAtual = rawComboPreco || (precoCentavosAtual ? precoCentavosAtual + 1000 : 2500);
+
+        document.documentElement.classList.add('g-modal-open');
+        document.body.classList.add('g-modal-open');
+
+        // Bebidas pré-selecionadas do combo
+        let selectedBebidas = [];
+        if (Array.isArray(p.combo?.bebidas)) {
+          selectedBebidas = p.combo.bebidas.map(b => typeof b === 'string' ? { produtoId: idParaSlug(b), nome: b } : { produtoId: b.produtoId || idParaSlug(b.nome), nome: b.nome });
+        } else if (p.combo?.bebidas && typeof p.combo.bebidas === 'string') {
+          selectedBebidas = p.combo.bebidas.split(',').map(s => s.trim()).filter(Boolean).map(nome => ({ produtoId: idParaSlug(nome), nome }));
+        }
 
         modalWrap.innerHTML = `
           <div class="g-modal-overlay" id="g-modal-overlay">
@@ -1006,84 +1026,109 @@ export async function renderGestaoV2(app) {
               </header>
 
               <form class="g-form-modal" id="g-form-product">
-                <!-- Dropzone de foto moderna -->
-                <div id="g-photo-container"></div>
+                <div class="g-form-modal-body">
+                  <!-- Dropzone de foto com enquadramento do painel -->
+                  <div id="g-photo-container"></div>
 
-                <!-- Nome e Preço -->
-                <div class="g-field-row">
-                  <div class="g-field-group" style="flex:2;">
-                    <label for="g-prod-nome">Nome do Produto *</label>
-                    <input id="g-prod-nome" name="nome" required maxlength="80" placeholder="Ex: X-Burger Especial" value="${esc(p.nome)}">
-                  </div>
-                  <div class="g-field-group" style="flex:1;">
-                    <label for="g-prod-preco">Preço (R$) *</label>
-                    <input id="g-prod-preco" name="preco" type="text" inputmode="numeric" placeholder="R$ 0,00" required>
-                  </div>
-                </div>
-
-                <!-- Categoria -->
-                <div class="g-field-group">
-                  <label for="g-prod-cat">Categoria do Produto</label>
-                  <input id="g-prod-cat" name="categoria" list="g-cat-suggestions-list" maxlength="60" placeholder="Ex: Lanches" value="${esc(p.categoria || '')}">
-                  <datalist id="g-cat-suggestions-list">
-                    ${distinctCats.map(c => `<option value="${esc(c)}">`).join('')}
-                  </datalist>
-                  <div class="g-cat-suggestions">
-                    <span class="g-suggestion-label">Sugestões:</span>
-                    ${['🍔 Lanches', '🍕 Pizzas', '🍟 Porções', '🥤 Bebidas', '🍰 Sobremesas', '🏷️ Combos', '🍺 Cervejas', '🥟 Salgados'].map(s => {
-                      const raw = s.replace(/^[^\w\s]+\s*/, '');
-                      return `<button type="button" class="g-chip-cat" data-cat-sug="${esc(raw)}">${s}</button>`;
-                    }).join('')}
-                  </div>
-                </div>
-
-                <!-- Descrição -->
-                <div class="g-field-group">
-                  <label for="g-prod-desc">Descrição e Ingredientes</label>
-                  <textarea id="g-prod-desc" name="descricao" rows="2" maxlength="300" placeholder="Ex: Pão artesanal, hambúrguer 160g, queijo cheddar, bacon crocante e molho especial.">${esc(p.descricao || '')}</textarea>
-                </div>
-
-                <!-- Opção de Combo -->
-                <div class="g-combo-box">
-                  <label class="g-check g-combo-check">
-                    <input type="checkbox" id="g-combo-ativo" name="comboAtivo" ${p.combo?.ativo ? 'checked' : ''}>
-                    <span><strong>Oferecer Combo</strong> (Lanche + Acompanhamento + Bebida)</span>
-                  </label>
-                  <div class="g-combo-content" id="g-combo-content" ${p.combo?.ativo ? '' : 'style="display:none;"'}>
-                    <div class="g-field-row">
-                      <div class="g-field-group" style="flex:1;">
-                        <label for="g-combo-preco">Preço do Combo Completo (R$)</label>
-                        <input id="g-combo-preco" name="comboPreco" type="text" inputmode="numeric" placeholder="R$ 0,00">
-                      </div>
-                      <div class="g-field-group" style="flex:2;">
-                        <label for="g-combo-fixos">Acompanhamento incluso</label>
-                        <input id="g-combo-fixos" name="comboFixos" placeholder="Ex: Batata frita individual 100g" value="${esc(p.combo?.fixos?.[0]?.nome || 'Batata frita individual')}">
-                      </div>
+                  <!-- Nome e Preço -->
+                  <div class="g-field-row">
+                    <div class="g-field-group" style="flex:2;">
+                      <label for="g-prod-nome">Nome do Produto *</label>
+                      <input id="g-prod-nome" name="nome" required maxlength="80" placeholder="Ex: X-Burger Especial" value="${esc(p.nome)}">
                     </div>
-                    <div class="g-field-group">
-                      <label for="g-combo-bebidas">Opções de Bebidas à escolha (separadas por vírgula)</label>
-                      <input id="g-combo-bebidas" name="comboBebidas" placeholder="Ex: Coca-Cola Lata, Guaraná Antarctica, Suco de Laranja, Água Mineral" value="${esc(p.combo?.bebidas?.map(b => b.nome).join(', ') || 'Coca-Cola 350ml, Guaraná Antarctica 350ml, Água Mineral 500ml')}">
+                    <div class="g-field-group" style="flex:1;">
+                      <label for="g-prod-preco">Preço (R$) *</label>
+                      <input id="g-prod-preco" name="preco" type="text" inputmode="numeric" placeholder="R$ 0,00" required>
                     </div>
                   </div>
+
+                  <!-- Categoria -->
+                  <div class="g-field-group">
+                    <label for="g-prod-cat">Categoria do Produto</label>
+                    <input id="g-prod-cat" name="categoria" list="g-cat-suggestions-list" maxlength="60" placeholder="Ex: Lanches" value="${esc(p.categoria || '')}">
+                    <datalist id="g-cat-suggestions-list">
+                      ${distinctCats.map(c => `<option value="${esc(c)}">`).join('')}
+                    </datalist>
+                    <div class="g-cat-suggestions">
+                      <span class="g-suggestion-label">Sugestões:</span>
+                      ${['🍔 Lanches', '🍕 Pizzas', '🍟 Porções', '🥤 Bebidas', '🍰 Sobremesas', '🏷️ Combos', '🍺 Cervejas', '🥟 Salgados'].map(s => {
+                        const raw = s.replace(/^[^\w\s]+\s*/, '');
+                        return `<button type="button" class="g-chip-cat" data-cat-sug="${esc(raw)}">${s}</button>`;
+                      }).join('')}
+                    </div>
+                  </div>
+
+                  <!-- Descrição -->
+                  <div class="g-field-group">
+                    <label for="g-prod-desc">Descrição e Ingredientes</label>
+                    <textarea id="g-prod-desc" name="descricao" rows="2" maxlength="300" placeholder="Ex: Pão artesanal, hambúrguer 160g, queijo cheddar, bacon crocante e molho especial.">${esc(p.descricao || '')}</textarea>
+                  </div>
+
+                  <!-- Opção de Combo -->
+                  <div class="g-combo-box">
+                    <label class="g-check g-combo-check">
+                      <input type="checkbox" id="g-combo-ativo" name="comboAtivo" ${p.combo?.ativo ? 'checked' : ''}>
+                      <span><strong>Oferecer Combo</strong> (Lanche + Acompanhamento + Bebida)</span>
+                    </label>
+                    <div class="g-combo-content" id="g-combo-content" ${p.combo?.ativo ? '' : 'style="display:none;"'}>
+                      <div class="g-field-row">
+                        <div class="g-field-group" style="flex:1;">
+                          <label for="g-combo-preco">Preço do Combo Completo (R$)</label>
+                          <input id="g-combo-preco" name="comboPreco" type="text" inputmode="numeric" placeholder="R$ 0,00">
+                        </div>
+                        <div class="g-field-group" style="flex:2;">
+                          <label for="g-combo-fixos">Acompanhamento incluso</label>
+                          <input id="g-combo-fixos" name="comboFixos" placeholder="Ex: Batata frita individual 100g" value="${esc(p.combo?.fixos?.[0]?.nome || 'Batata frita individual')}">
+                        </div>
+                      </div>
+
+                      <div class="g-field-group" style="margin-top:6px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                          <label style="margin:0; font-weight:700; color:#1e40af;">Opções de Bebidas inclusas no Combo</label>
+                          <span id="g-combo-count" style="font-size:12px; font-weight:700; color:#2563eb;"></span>
+                        </div>
+                        
+                        <!-- Chips das bebidas já selecionadas -->
+                        <div class="g-combo-selected-chips" id="g-combo-selected-chips"></div>
+
+                        <!-- Filtro de Categorias & Busca de bebidas -->
+                        <div class="g-combo-cat-filter-row">
+                          <div class="g-combo-cat-chips" id="g-combo-cat-chips"></div>
+                          <input type="text" id="g-combo-search-bebida" class="g-combo-search-input" placeholder="🔍 Buscar bebida...">
+                        </div>
+
+                        <!-- Grid de Seleção de Bebidas -->
+                        <div class="g-combo-beverages-picker" id="g-combo-beverages-picker"></div>
+
+                        <!-- Adicionar Bebida Avulsa -->
+                        <div class="g-combo-add-custom-row">
+                          <input type="text" id="g-combo-custom-input" placeholder="Ou digite outra bebida (ex: Suco de Maracujá 400ml)...">
+                          <button type="button" class="btn-ghost" id="g-combo-btn-add-custom">+ Adicionar</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Switches de status -->
+                  <div class="g-status-switches">
+                    <label class="g-check">
+                      <input type="checkbox" name="ativo" ${p.ativo !== false ? 'checked' : ''}>
+                      <span>Mostrar no cardápio online</span>
+                    </label>
+                    <label class="g-check">
+                      <input type="checkbox" name="esgotado" ${p.esgotado ? 'checked' : ''}>
+                      <span style="color:#c2410c; font-weight:600;">Esgotado temporariamente</span>
+                    </label>
+                  </div>
+
+                  <p class="g-result" role="status" style="margin:4px 0 0;"></p>
                 </div>
 
-                <!-- Switches de status -->
-                <div class="g-status-switches">
-                  <label class="g-check">
-                    <input type="checkbox" name="ativo" ${p.ativo !== false ? 'checked' : ''}>
-                    <span>Mostrar no cardápio online</span>
-                  </label>
-                  <label class="g-check">
-                    <input type="checkbox" name="esgotado" ${p.esgotado ? 'checked' : ''}>
-                    <span style="color:#c2410c; font-weight:600;">Esgotado temporariamente</span>
-                  </label>
-                </div>
-
-                <div class="g-modal-actions">
+                <!-- Rodapé Fixo (sempre visível sem descer barra) -->
+                <footer class="g-modal-footer">
                   <button type="button" class="btn-ghost" id="g-modal-cancel">Cancelar</button>
-                  <button type="submit" class="btn-primary g-btn-save-prod" style="padding:10px 24px;">Salvar Produto</button>
-                </div>
-                <p class="g-result" role="status" style="margin:4px 0 0;"></p>
+                  <button type="submit" class="btn-primary g-btn-save-prod">Salvar Produto</button>
+                </footer>
               </form>
             </div>
           </div>
@@ -1104,6 +1149,8 @@ export async function renderGestaoV2(app) {
         function fechar() {
           modalWrap.innerHTML = '';
           productDraft = null;
+          document.documentElement.classList.remove('g-modal-open');
+          document.body.classList.remove('g-modal-open');
         }
 
         closeBtn.onclick = fechar;
@@ -1127,6 +1174,117 @@ export async function renderGestaoV2(app) {
           };
         });
 
+        // Configuração do Seletor de Bebidas do Combo
+        const chipsWrap = form.querySelector('#g-combo-selected-chips');
+        const countEl = form.querySelector('#g-combo-count');
+        const catChipsWrap = form.querySelector('#g-combo-cat-chips');
+        const searchInputBebida = form.querySelector('#g-combo-search-bebida');
+        const pickerWrap = form.querySelector('#g-combo-beverages-picker');
+        const customInput = form.querySelector('#g-combo-custom-input');
+        const addCustomBtn = form.querySelector('#g-combo-btn-add-custom');
+
+        const allCats = [...new Set(products.map(x => x.categoria?.trim()).filter(Boolean))];
+        let activeBevCat = allCats.find(c => /bebida|refrig|suco|cervej/i.test(c)) || 'Todas';
+
+        function renderCatChips() {
+          const catList = ['Todas', ...allCats];
+          catChipsWrap.innerHTML = catList.map(c => `
+            <button type="button" class="g-combo-cat-btn ${activeBevCat === c ? 'is-active' : ''}" data-cat="${esc(c)}">${esc(c)}</button>
+          `).join('');
+
+          catChipsWrap.querySelectorAll('[data-cat]').forEach(btn => {
+            btn.onclick = () => {
+              activeBevCat = btn.dataset.cat;
+              renderCatChips();
+              renderPicker();
+            };
+          });
+        }
+
+        function renderChips() {
+          countEl.textContent = `${selectedBebidas.length} selecionada${selectedBebidas.length === 1 ? '' : 's'}`;
+          chipsWrap.innerHTML = selectedBebidas.map((b, idx) => `
+            <span class="g-combo-chip-item">
+              <span>${esc(b.nome)}</span>
+              <button type="button" class="g-combo-chip-del" data-del-idx="${idx}" title="Remover bebida">✕</button>
+            </span>
+          `).join('');
+
+          chipsWrap.querySelectorAll('[data-del-idx]').forEach(btn => {
+            btn.onclick = e => {
+              e.stopPropagation();
+              const idx = Number(btn.dataset.delIdx);
+              selectedBebidas.splice(idx, 1);
+              renderChips();
+              renderPicker();
+            };
+          });
+        }
+
+        function renderPicker() {
+          const q = searchInputBebida.value.trim().toLowerCase();
+          const available = products.filter(prod => {
+            const matchesCat = activeBevCat === 'Todas' || (prod.categoria?.trim() || '') === activeBevCat;
+            const matchesQuery = !q || prod.nome.toLowerCase().includes(q) || (prod.categoria || '').toLowerCase().includes(q);
+            return matchesCat && matchesQuery;
+          });
+
+          if (!available.length) {
+            pickerWrap.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:16px; font-size:12px; color:#94a3b8;">Nenhum item encontrado nesta categoria. Use o campo abaixo para adicionar bebida avulsa.</div>`;
+            return;
+          }
+
+          pickerWrap.innerHTML = available.map(prod => {
+            const isSel = selectedBebidas.some(b => b.produtoId === prod.id || b.nome.toLowerCase() === prod.nome.toLowerCase());
+            return `
+              <div class="g-combo-bev-option ${isSel ? 'is-selected' : ''}" data-id="${esc(prod.id)}" data-nome="${esc(prod.nome)}">
+                <span class="g-combo-bev-check">${isSel ? '✓' : ''}</span>
+                <span class="g-combo-bev-name" title="${esc(prod.nome)}">${esc(prod.nome)}</span>
+              </div>
+            `;
+          }).join('');
+
+          pickerWrap.querySelectorAll('.g-combo-bev-option').forEach(opt => {
+            opt.onclick = () => {
+              const pid = opt.dataset.id;
+              const nome = opt.dataset.nome;
+              const foundIdx = selectedBebidas.findIndex(b => b.produtoId === pid || b.nome.toLowerCase() === nome.toLowerCase());
+              if (foundIdx >= 0) {
+                selectedBebidas.splice(foundIdx, 1);
+              } else {
+                selectedBebidas.push({ produtoId: pid, nome });
+              }
+              renderChips();
+              renderPicker();
+            };
+          });
+        }
+
+        renderCatChips();
+        renderChips();
+        renderPicker();
+
+        searchInputBebida.oninput = () => renderPicker();
+
+        function addCustomBebida() {
+          const val = customInput.value.trim();
+          if (!val) return;
+          if (!selectedBebidas.some(b => b.nome.toLowerCase() === val.toLowerCase())) {
+            selectedBebidas.push({ produtoId: idParaSlug(val), nome: val });
+          }
+          customInput.value = '';
+          renderChips();
+          renderPicker();
+        }
+
+        addCustomBtn.onclick = addCustomBebida;
+        customInput.onkeydown = e => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            addCustomBebida();
+          }
+        };
+
         renderFotoGestao(photoContainer, p.imagemUrl, async file => {
           if (busy || uncertain) throw Error('Aguarde o salvamento antes de enviar outra foto.');
           busy = true; const uid = s.auth.currentUser?.uid;
@@ -1143,7 +1301,7 @@ export async function renderGestaoV2(app) {
             busy = false;
             if (valid()) content.querySelectorAll('button,input,select').forEach(el => el.disabled = false);
           }
-        });
+        }, p.fotoEnquadramento, p.nome);
 
         form.onsubmit = async e => {
           e.preventDefault();
@@ -1164,19 +1322,20 @@ export async function renderGestaoV2(app) {
           let comboPayload = undefined;
           if (comboAtivoCheck.checked) {
             const fixosNome = fields.comboFixos.value.trim() || 'Acompanhamento';
-            const bebidasRaw = fields.comboBebidas.value.trim() || 'Refrigerante Lata';
-            const bebidasList = bebidasRaw.split(',').map(b => b.trim()).filter(Boolean).map(nome => ({
-              produtoId: idParaSlug(nome),
-              nome
-            }));
             comboPayload = {
               ativo: true,
               preco: comboPrecoCentavosAtual,
               fixos: [{ quantidade: 1, nome: fixosNome }],
-              bebidas: bebidasList.length > 0 ? bebidasList : [{ produtoId: 'bebida-padrao', nome: 'Refrigerante 350ml' }]
+              bebidas: selectedBebidas.length > 0 ? selectedBebidas : [{ produtoId: 'bebida-padrao', nome: 'Refrigerante 350ml' }]
             };
           } else {
             comboPayload = { ativo: false };
+          }
+
+          const fotoEnquadramentoRaw = form.querySelector('[name=fotoEnquadramento]')?.value;
+          let fotoEnquadramento = undefined;
+          if (fotoEnquadramentoRaw) {
+            try { fotoEnquadramento = JSON.parse(fotoEnquadramentoRaw); } catch {}
           }
 
           const payload = {
@@ -1184,6 +1343,7 @@ export async function renderGestaoV2(app) {
             versao: productVersion,
             produtoId: p.id,
             imagemUrl: fotoVal,
+            fotoEnquadramento,
             nome: nomeVal,
             categoria: fields.categoria.value.trim(),
             descricao: fields.descricao.value.trim(),
@@ -1205,6 +1365,7 @@ export async function renderGestaoV2(app) {
             await load(false);
             productDraft = null;
             draftGuard.clear('g-form-product');
+            fechar();
             draw();
             say('Produto salvo com sucesso no cardápio!', 'success');
           } catch (err) {
@@ -1224,6 +1385,9 @@ export async function renderGestaoV2(app) {
       function editProductOptions(p) {
         let grupos = structuredClone(p.grupos || []);
 
+        document.documentElement.classList.add('g-modal-open');
+        document.body.classList.add('g-modal-open');
+
         modalWrap.innerHTML = `
           <div class="g-modal-overlay" id="g-modal-options-overlay">
             <div class="g-modal-card g-options-modal-card" role="dialog" aria-modal="true" aria-labelledby="g-opt-title">
@@ -1235,55 +1399,57 @@ export async function renderGestaoV2(app) {
                 <button type="button" class="g-modal-close" id="g-opt-close" aria-label="Fechar">✕</button>
               </header>
 
-              <div class="g-form-modal" style="gap:16px;">
-                <div class="g-template-chips-wrap">
-                  <span style="font-size:12px; font-weight:700; color:var(--navy); width:100%; display:block; margin-bottom:4px;">
-                    💡 Modelos rápidos para adicionar com 1 clique:
-                  </span>
-                  <button type="button" class="g-template-chip" data-template="ponto">
-                    🥩 + Ponto da Carne (Obrigatório)
-                  </button>
-                  <button type="button" class="g-template-chip" data-template="molhos">
-                    🥫 + Molhos da Casa (Até 2)
-                  </button>
-                  <button type="button" class="g-template-chip" data-template="adicionais">
-                    🥓 + Adicionais Extras (Bacon, Queijo, etc.)
-                  </button>
-                  <button type="button" class="g-template-chip" data-template="queijo">
-                    🧀 + Escolha do Queijo (Cheddar, Prato, etc.)
-                  </button>
-                </div>
-
-                <div class="g-groups-list" id="g-groups-list"></div>
-
-                <div style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:12px; padding:16px;">
-                  <strong style="display:block; font-size:13.5px; color:var(--navy); margin-bottom:10px;">
-                    + Criar Novo Grupo de Opções Personalizado
-                  </strong>
-                  <div class="g-field-row">
-                    <div class="g-field-group" style="flex:2;">
-                      <label for="g-new-grp-nome">Nome do Grupo</label>
-                      <input id="g-new-grp-nome" placeholder="Ex: Molhos Especiais, Pão...">
-                    </div>
-                    <div class="g-field-group" style="flex:1;">
-                      <label for="g-new-grp-min">Mínimo</label>
-                      <input id="g-new-grp-min" type="number" min="0" max="10" value="0">
-                    </div>
-                    <div class="g-field-group" style="flex:1;">
-                      <label for="g-new-grp-max">Máximo</label>
-                      <input id="g-new-grp-max" type="number" min="1" max="20" value="1">
-                    </div>
+              <div class="g-form-modal">
+                <div class="g-form-modal-body" style="gap:16px;">
+                  <div class="g-template-chips-wrap">
+                    <span style="font-size:12px; font-weight:700; color:var(--navy); width:100%; display:block; margin-bottom:4px;">
+                      💡 Modelos rápidos para adicionar com 1 clique:
+                    </span>
+                    <button type="button" class="g-template-chip" data-template="ponto">
+                      🥩 + Ponto da Carne (Obrigatório)
+                    </button>
+                    <button type="button" class="g-template-chip" data-template="molhos">
+                      🥫 + Molhos da Casa (Até 2)
+                    </button>
+                    <button type="button" class="g-template-chip" data-template="adicionais">
+                      🥓 + Adicionais Extras (Bacon, Queijo, etc.)
+                    </button>
+                    <button type="button" class="g-template-chip" data-template="queijo">
+                      🧀 + Escolha do Queijo (Cheddar, Prato, etc.)
+                    </button>
                   </div>
-                  <button type="button" class="btn-outline" id="g-btn-add-group" style="margin-top:10px; width:100%;">
-                    + Adicionar Grupo
-                  </button>
+
+                  <div class="g-groups-list" id="g-groups-list"></div>
+
+                  <div style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:12px; padding:16px;">
+                    <strong style="display:block; font-size:13.5px; color:var(--navy); margin-bottom:10px;">
+                      + Criar Novo Grupo de Opções Personalizado
+                    </strong>
+                    <div class="g-field-row">
+                      <div class="g-field-group" style="flex:2;">
+                        <label for="g-new-grp-nome">Nome do Grupo</label>
+                        <input id="g-new-grp-nome" placeholder="Ex: Molhos Especiais, Pão...">
+                      </div>
+                      <div class="g-field-group" style="flex:1;">
+                        <label for="g-new-grp-min">Mínimo</label>
+                        <input id="g-new-grp-min" type="number" min="0" max="10" value="0">
+                      </div>
+                      <div class="g-field-group" style="flex:1;">
+                        <label for="g-new-grp-max">Máximo</label>
+                        <input id="g-new-grp-max" type="number" min="1" max="20" value="1">
+                      </div>
+                    </div>
+                    <button type="button" class="btn-outline" id="g-btn-add-group" style="margin-top:10px; width:100%;">
+                      + Adicionar Grupo
+                    </button>
+                  </div>
                 </div>
 
-                <div class="g-modal-actions">
+                <footer class="g-modal-footer">
+                  <p class="g-result" id="g-opt-result" role="status" style="margin:0; font-size:12px;"></p>
                   <button type="button" class="btn-ghost" id="g-opt-cancel">Cancelar</button>
-                  <button type="button" class="btn-primary" id="g-opt-save" style="padding:10px 24px;">Salvar Opções</button>
-                </div>
-                <p class="g-result" id="g-opt-result" role="status" style="margin:4px 0 0;"></p>
+                  <button type="button" class="g-btn-save-prod" id="g-opt-save">Salvar Opções</button>
+                </footer>
               </div>
             </div>
           </div>
@@ -1299,6 +1465,8 @@ export async function renderGestaoV2(app) {
 
         function fechar() {
           modalWrap.innerHTML = '';
+          document.documentElement.classList.remove('g-modal-open');
+          document.body.classList.remove('g-modal-open');
         }
 
         closeBtn.onclick = fechar;

@@ -1,3 +1,9 @@
+import { esc } from "../lib/format.js";
+import { htmlFoto, normalizarEnquadramento } from "../lib/foto.js";
+import { abrirEditorFoto } from "./painel-foto.js";
+import "../lib/foto.css";
+import "./painel-foto.css";
+
 export function validarFotoV2(value) {
   if (!value) return;
   let url;
@@ -7,16 +13,21 @@ export function validarFotoV2(value) {
   }
 }
 
-export function renderFotoGestao(container, initialUrl = '', onUpload = null) {
+export function renderFotoGestao(container, initialUrl = '', onUpload = null, initialEnquadramento = null, productName = '') {
+  let currentUrl = initialUrl || '';
+  let currentEnquadramento = normalizarEnquadramento(initialEnquadramento);
+
   const wrapper = document.createElement('div');
   wrapper.className = 'g-photo-box';
 
   wrapper.innerHTML = `
     <label class="g-field-label">Foto do Produto</label>
-    <div class="g-photo-dropzone" id="g-photo-dropzone">
-      <div class="g-photo-preview-wrap ${initialUrl ? 'has-image' : 'is-empty'}">
-        <img src="${initialUrl || ''}" alt="Foto do produto" class="g-photo-img ${initialUrl ? '' : 'is-hidden'}">
-        <div class="g-photo-empty ${initialUrl ? 'is-hidden' : ''}">
+    <div class="g-photo-dropzone ${currentUrl ? 'has-image' : ''}" id="g-photo-dropzone">
+      <div class="g-photo-preview-wrap ${currentUrl ? 'has-image' : 'is-empty'}">
+        <div class="g-photo-previa-box ${currentUrl ? '' : 'is-hidden'}">
+          ${currentUrl ? htmlFoto({ fotoUrl: currentUrl, fotoEnquadramento: currentEnquadramento }) : ''}
+        </div>
+        <div class="g-photo-empty ${currentUrl ? 'is-hidden' : ''}">
           <div class="g-photo-icon">
             <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="5" width="18" height="14" rx="2"></rect>
@@ -30,15 +41,29 @@ export function renderFotoGestao(container, initialUrl = '', onUpload = null) {
       </div>
 
       <input type="file" class="g-photo-file-input" accept="image/jpeg,image/png,image/webp" hidden>
-      <input type="hidden" name="imagemUrl" value="${initialUrl || ''}">
+      <input type="hidden" name="imagemUrl" value="${esc(currentUrl)}">
+      <input type="hidden" name="fotoEnquadramento" value="${currentEnquadramento ? esc(JSON.stringify(currentEnquadramento)) : ''}">
 
       <div class="g-photo-btn-row">
         <button type="button" class="btn-primary g-btn-pick-photo">
-          <span>📷</span>
-          <span>${initialUrl ? 'Trocar Foto' : 'Escolher Foto'}</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+          <span class="g-photo-btn-label">${currentUrl ? 'Trocar Foto' : 'Escolher Foto'}</span>
         </button>
-        <button type="button" class="btn-ghost g-btn-remove-photo ${initialUrl ? '' : 'is-hidden'}" style="color:#ef4444;">
-          <span>🗑️</span>
+        <button type="button" class="btn-ghost g-btn-adjust-photo ${currentUrl ? '' : 'is-hidden'}" title="Ajustar enquadramento e zoom">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Ajustar Foto</span>
+        </button>
+        <button type="button" class="btn-ghost g-btn-remove-photo ${currentUrl ? '' : 'is-hidden'}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
           <span>Remover Foto</span>
         </button>
       </div>
@@ -50,16 +75,34 @@ export function renderFotoGestao(container, initialUrl = '', onUpload = null) {
 
   const fileInput = wrapper.querySelector('.g-photo-file-input');
   const hiddenInput = wrapper.querySelector('[name=imagemUrl]');
+  const hiddenEnquadramento = wrapper.querySelector('[name=fotoEnquadramento]');
   const pickBtn = wrapper.querySelector('.g-btn-pick-photo');
+  const adjustBtn = wrapper.querySelector('.g-btn-adjust-photo');
   const removeBtn = wrapper.querySelector('.g-btn-remove-photo');
-  const imgEl = wrapper.querySelector('.g-photo-img');
   const emptyEl = wrapper.querySelector('.g-photo-empty');
+  const previaBox = wrapper.querySelector('.g-photo-previa-box');
   const previewWrap = wrapper.querySelector('.g-photo-preview-wrap');
   const status = wrapper.querySelector('.g-photo-status');
   const dropzone = wrapper.querySelector('#g-photo-dropzone');
 
   pickBtn.onclick = () => fileInput.click();
-  previewWrap.onclick = () => fileInput.click();
+  emptyEl.onclick = () => fileInput.click();
+
+  adjustBtn.onclick = () => {
+    if (!currentUrl) return;
+    const prodNome = productName || document.querySelector('#g-prod-nome')?.value || 'Produto';
+    abrirEditorFoto({
+      nome: prodNome,
+      fotoUrl: currentUrl,
+      enquadramento: currentEnquadramento,
+      onSave: novoAjuste => {
+        currentEnquadramento = novoAjuste;
+        hiddenEnquadramento.value = JSON.stringify(novoAjuste);
+        previaBox.innerHTML = htmlFoto({ fotoUrl: currentUrl, fotoEnquadramento: currentEnquadramento });
+        hiddenEnquadramento.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+  };
 
   // Drag & drop support
   ['dragenter', 'dragover'].forEach(evt => {
@@ -99,13 +142,17 @@ export function renderFotoGestao(container, initialUrl = '', onUpload = null) {
     // Instant local preview
     const reader = new FileReader();
     reader.onload = ev => {
-      imgEl.src = ev.target.result;
-      imgEl.classList.remove('is-hidden');
+      currentUrl = ev.target.result;
+      previaBox.innerHTML = htmlFoto({ fotoUrl: currentUrl, fotoEnquadramento: currentEnquadramento });
+      previaBox.classList.remove('is-hidden');
       emptyEl.classList.add('is-hidden');
       previewWrap.classList.add('has-image');
       previewWrap.classList.remove('is-empty');
+      dropzone.classList.add('has-image');
+      adjustBtn.classList.remove('is-hidden');
       removeBtn.classList.remove('is-hidden');
-      pickBtn.querySelector('span:last-child').textContent = 'Trocar Foto';
+      const label = pickBtn.querySelector('.g-photo-btn-label');
+      if (label) label.textContent = 'Trocar Foto';
     };
     reader.readAsDataURL(file);
 
@@ -115,8 +162,10 @@ export function renderFotoGestao(container, initialUrl = '', onUpload = null) {
       pickBtn.disabled = true;
       try {
         const uploadedUrl = await onUpload(file);
+        currentUrl = uploadedUrl;
         hiddenInput.value = uploadedUrl;
         hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+        previaBox.innerHTML = htmlFoto({ fotoUrl: currentUrl, fotoEnquadramento: currentEnquadramento });
         status.textContent = 'Foto pronta para salvar!';
         status.dataset.tone = 'success';
       } catch (err) {
@@ -130,15 +179,19 @@ export function renderFotoGestao(container, initialUrl = '', onUpload = null) {
   }
 
   removeBtn.onclick = () => {
+    currentUrl = '';
     hiddenInput.value = '';
     hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
-    imgEl.src = '';
-    imgEl.classList.add('is-hidden');
+    previaBox.innerHTML = '';
+    previaBox.classList.add('is-hidden');
     emptyEl.classList.remove('is-hidden');
     previewWrap.classList.remove('has-image');
     previewWrap.classList.add('is-empty');
+    dropzone.classList.remove('has-image');
+    adjustBtn.classList.add('is-hidden');
     removeBtn.classList.add('is-hidden');
-    pickBtn.querySelector('span:last-child').textContent = 'Escolher Foto';
+    const label = pickBtn.querySelector('.g-photo-btn-label');
+    if (label) label.textContent = 'Escolher Foto';
     status.textContent = 'Foto removida.';
     status.dataset.tone = 'info';
     fileInput.value = '';
