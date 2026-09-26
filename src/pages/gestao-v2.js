@@ -797,16 +797,15 @@ export async function renderGestaoV2(app) {
           const novoWhats = shopForm.elements.whatsapp?.value?.replace(/\D/g, '');
           const novoLogo = logoHidden.value?.trim();
 
-          await s.call('salvarModulosV2', { lojaId, ...draft, cozinha: data.cozinha });
-          if (novoNome || novoWhats || novoLogo) {
-            await s.call('salvarContatoLojaV2', {
-              lojaId,
-              versao: data.versao,
-              nome: novoNome || data.nome,
-              whatsapp: novoWhats || (data.contato?.whatsapp ?? ''),
-              logoUrl: novoLogo || ''
-            });
-          }
+          await s.call('salvarModulosV2', {
+            lojaId,
+            versao: data.versao,
+            ...draft,
+            cozinha: data.cozinha,
+            nome: novoNome || data.nome,
+            whatsapp: novoWhats !== undefined ? novoWhats : (data.contato?.whatsapp ?? ''),
+            logoUrl: novoLogo !== undefined ? novoLogo : (data.logoUrl ?? '')
+          });
           if (!valid()) return;
           uncertain = true; await load(false); lojaDraft = null; draftGuard.clear('g-shop'); draw();
           say('Configurações da loja atualizadas com sucesso!', 'success');
@@ -836,8 +835,16 @@ export async function renderGestaoV2(app) {
         }
       };
 
-      // Categorias únicas existentes para filtros e datalist
-      const distinctCats = [...new Set(products.map(p => p.categoria?.trim()).filter(Boolean))].sort();
+      // Categorias únicas existentes para filtros e datalist ordenadas de forma intuitiva
+      const prioridadeCategorias = ['Lanches', 'Pizzas', 'Porções', 'Combos', 'Bebidas', 'Refrigerantes', 'Cervejas', 'Sobremesas', 'Salgados', 'Geral'];
+      const distinctCats = [...new Set(products.map(p => p.categoria?.trim()).filter(Boolean))].sort((a, b) => {
+        const ia = prioridadeCategorias.findIndex(cat => cat.toLowerCase() === a.toLowerCase());
+        const ib = prioridadeCategorias.findIndex(cat => cat.toLowerCase() === b.toLowerCase());
+        if (ia !== -1 && ib !== -1) return ia - ib;
+        if (ia !== -1) return -1;
+        if (ib !== -1) return 1;
+        return a.localeCompare(b, 'pt-BR');
+      });
 
       // Renderiza as Category Pills
       function renderPills() {
@@ -1045,12 +1052,16 @@ export async function renderGestaoV2(app) {
                   <!-- Categoria -->
                   <div class="g-field-group">
                     <label for="g-prod-cat">Categoria do Produto</label>
-                    <input id="g-prod-cat" name="categoria" list="g-cat-suggestions-list" maxlength="60" placeholder="Ex: Lanches" value="${esc(p.categoria || '')}">
-                    <datalist id="g-cat-suggestions-list">
-                      ${distinctCats.map(c => `<option value="${esc(c)}">`).join('')}
-                    </datalist>
-                    <div class="g-cat-suggestions">
-                      <span class="g-suggestion-label">Sugestões:</span>
+                    <div style="display:flex; gap:8px;">
+                      <select id="g-prod-cat-select" style="flex:1; height:42px; border-radius:10px; border:1.5px solid #cbd5e1; padding:0 12px; font-size:14px; background:#fff; font-weight:600; color:var(--navy);">
+                        <option value="">-- Selecione uma categoria --</option>
+                        ${distinctCats.map(c => `<option value="${esc(c)}" ${p.categoria === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+                        <option value="__nova__">+ Nova categoria (digitar)...</option>
+                      </select>
+                      <input id="g-prod-cat" name="categoria" maxlength="60" placeholder="Digite a categoria" value="${esc(p.categoria || '')}" style="flex:1; height:42px; font-size:14px; display:${distinctCats.includes(p.categoria) && p.categoria ? 'none' : 'block'};">
+                    </div>
+                    <div class="g-cat-suggestions" style="margin-top:6px;">
+                      <span class="g-suggestion-label">Atalhos rápidos:</span>
                       ${['🍔 Lanches', '🍕 Pizzas', '🍟 Porções', '🥤 Bebidas', '🍰 Sobremesas', '🏷️ Combos', '🍺 Cervejas', '🥟 Salgados'].map(s => {
                         const raw = s.replace(/^[^\w\s]+\s*/, '');
                         return `<button type="button" class="g-chip-cat" data-cat-sug="${esc(raw)}">${s}</button>`;
@@ -1083,25 +1094,30 @@ export async function renderGestaoV2(app) {
                       </div>
 
                       <div class="g-field-group" style="margin-top:6px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
-                          <label style="margin:0; font-weight:700; color:#1e40af;">Opções de Bebidas inclusas no Combo</label>
-                          <span id="g-combo-count" style="font-size:12px; font-weight:700; color:#2563eb;"></span>
-                        </div>
+                        <label style="margin:0 0 6px; font-weight:700; color:#1e40af; font-size:13.5px;">Opções de Bebidas inclusas no Combo</label>
                         
-                        <!-- Chips das bebidas já selecionadas -->
-                        <div class="g-combo-selected-chips" id="g-combo-selected-chips"></div>
-
-                        <!-- Filtro de Categorias & Busca de bebidas -->
-                        <div class="g-combo-cat-filter-row">
-                          <div class="g-combo-cat-chips" id="g-combo-cat-chips"></div>
-                          <input type="text" id="g-combo-search-bebida" class="g-combo-search-input" placeholder="🔍 Buscar bebida...">
+                        <!-- Barra de Ferramentas de Filtro e Busca -->
+                        <div class="g-combo-filter-toolbar" style="display:flex; gap:8px; margin-bottom:10px;">
+                          <select id="g-combo-cat-select" class="g-combo-cat-select" style="flex:1; height:38px; border-radius:8px; border:1px solid #cbd5e1; padding:0 10px; font-size:13px; font-weight:600; background:#fff;">
+                            <!-- Preenchido via JS -->
+                          </select>
+                          <input type="text" id="g-combo-search-bebida" class="g-combo-search-input" placeholder="🔍 Buscar bebida..." style="flex:1.5; height:38px; font-size:13px;">
                         </div>
 
-                        <!-- Grid de Seleção de Bebidas -->
+                        <!-- 1) Grid de Seleção de Bebidas (Fica em cima) -->
                         <div class="g-combo-beverages-picker" id="g-combo-beverages-picker"></div>
 
-                        <!-- Adicionar Bebida Avulsa -->
-                        <div class="g-combo-add-custom-row">
+                        <!-- 2) Bebidas Selecionadas (Fica em baixo, como o usuário pediu!) -->
+                        <div class="g-combo-selected-section" style="margin-top:10px; padding:10px 12px; background:#eff6ff; border-radius:10px; border:1px solid #bfdbfe;">
+                          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <strong style="font-size:12.5px; color:#1e40af;">🥤 Bebidas Selecionadas no Combo:</strong>
+                            <span id="g-combo-count" style="font-size:12px; font-weight:700; color:#2563eb;">0 selecionadas</span>
+                          </div>
+                          <div class="g-combo-selected-chips" id="g-combo-selected-chips"></div>
+                        </div>
+
+                        <!-- 3) Adicionar Bebida Avulsa -->
+                        <div class="g-combo-add-custom-row" style="margin-top:8px;">
                           <input type="text" id="g-combo-custom-input" placeholder="Ou digite outra bebida (ex: Suco de Maracujá 400ml)...">
                           <button type="button" class="btn-ghost" id="g-combo-btn-add-custom">+ Adicionar</button>
                         </div>
@@ -1167,17 +1183,41 @@ export async function renderGestaoV2(app) {
           comboContent.style.display = comboAtivoCheck.checked ? '' : 'none';
         };
 
-        form.querySelectorAll('[data-cat-sug]').forEach(btn => {
-          btn.onclick = () => {
-            inputCat.value = btn.dataset.catSug;
-            inputCat.focus();
+        const catSelect = form.querySelector('#g-prod-cat-select');
+        if (catSelect && inputCat) {
+          catSelect.onchange = () => {
+            if (catSelect.value === '__nova__') {
+              inputCat.style.display = 'block';
+              inputCat.value = '';
+              inputCat.focus();
+            } else if (catSelect.value) {
+              inputCat.value = catSelect.value;
+              inputCat.style.display = 'none';
+            } else {
+              inputCat.style.display = 'block';
+            }
           };
-        });
+          form.querySelectorAll('[data-cat-sug]').forEach(btn => {
+            btn.onclick = () => {
+              const val = btn.dataset.catSug;
+              inputCat.value = val;
+              let opt = Array.from(catSelect.options).find(o => o.value === val);
+              if (!opt) {
+                opt = document.createElement('option');
+                opt.value = val;
+                opt.textContent = val;
+                catSelect.add(opt, catSelect.options.length - 1);
+              }
+              catSelect.value = val;
+              inputCat.style.display = 'none';
+            };
+          });
+        }
 
         // Configuração do Seletor de Bebidas do Combo
         const chipsWrap = form.querySelector('#g-combo-selected-chips');
         const countEl = form.querySelector('#g-combo-count');
-        const catChipsWrap = form.querySelector('#g-combo-cat-chips');
+        const catSelectBebida = form.querySelector('#g-combo-cat-select');
         const searchInputBebida = form.querySelector('#g-combo-search-bebida');
         const pickerWrap = form.querySelector('#g-combo-beverages-picker');
         const customInput = form.querySelector('#g-combo-custom-input');
@@ -1186,19 +1226,18 @@ export async function renderGestaoV2(app) {
         const allCats = [...new Set(products.map(x => x.categoria?.trim()).filter(Boolean))];
         let activeBevCat = allCats.find(c => /bebida|refrig|suco|cervej/i.test(c)) || 'Todas';
 
-        function renderCatChips() {
-          const catList = ['Todas', ...allCats];
-          catChipsWrap.innerHTML = catList.map(c => `
-            <button type="button" class="g-combo-cat-btn ${activeBevCat === c ? 'is-active' : ''}" data-cat="${esc(c)}">${esc(c)}</button>
+        function renderCatSelect() {
+          const catList = ['Todas as Categorias', ...allCats];
+          catSelectBebida.innerHTML = catList.map(c => `
+            <option value="${esc(c)}" ${(activeBevCat === c || (c === 'Todas as Categorias' && activeBevCat === 'Todas')) ? 'selected' : ''}>
+              ${c === 'Todas as Categorias' ? '🥤 Todas as Categorias de Bebidas' : esc(c)}
+            </option>
           `).join('');
 
-          catChipsWrap.querySelectorAll('[data-cat]').forEach(btn => {
-            btn.onclick = () => {
-              activeBevCat = btn.dataset.cat;
-              renderCatChips();
-              renderPicker();
-            };
-          });
+          catSelectBebida.onchange = () => {
+            activeBevCat = catSelectBebida.value === 'Todas as Categorias' ? 'Todas' : catSelectBebida.value;
+            renderPicker();
+          };
         }
 
         function renderChips() {
@@ -1260,7 +1299,7 @@ export async function renderGestaoV2(app) {
           });
         }
 
-        renderCatChips();
+        renderCatSelect();
         renderChips();
         renderPicker();
 
@@ -1322,9 +1361,11 @@ export async function renderGestaoV2(app) {
           let comboPayload = undefined;
           if (comboAtivoCheck.checked) {
             const fixosNome = fields.comboFixos.value.trim() || 'Acompanhamento';
+            const comboCentavos = Math.round(Number(comboPrecoCentavosAtual) || 0);
             comboPayload = {
               ativo: true,
-              preco: comboPrecoCentavosAtual,
+              preco: comboCentavos,
+              precoCentavos: comboCentavos,
               fixos: [{ quantidade: 1, nome: fixosNome }],
               bebidas: selectedBebidas.length > 0 ? selectedBebidas : [{ produtoId: 'bebida-padrao', nome: 'Refrigerante 350ml' }]
             };
@@ -1346,8 +1387,8 @@ export async function renderGestaoV2(app) {
             fotoEnquadramento,
             nome: nomeVal,
             categoria: fields.categoria.value.trim(),
-            descricao: fields.descricao.value.trim(),
-            precoCentavos: precoCentavosAtual,
+            descricao: fields.descricao.value.replace(/[\r\n]+/g, ' ').trim(),
+            precoCentavos: Math.round(Number(precoCentavosAtual) || 0),
             ativo: fields.ativo.checked,
             esgotado: fields.esgotado.checked,
             combo: comboPayload,
@@ -1425,21 +1466,26 @@ export async function renderGestaoV2(app) {
                     <strong style="display:block; font-size:13.5px; color:var(--navy); margin-bottom:10px;">
                       + Criar Novo Grupo de Opções Personalizado
                     </strong>
-                    <div class="g-field-row">
+                    <div class="g-field-row" style="align-items:flex-end;">
                       <div class="g-field-group" style="flex:2;">
                         <label for="g-new-grp-nome">Nome do Grupo</label>
-                        <input id="g-new-grp-nome" placeholder="Ex: Molhos Especiais, Pão...">
+                        <input id="g-new-grp-nome" placeholder="Ex: Molhos Especiais, Ponto da Carne, Queijo...">
                       </div>
-                      <div class="g-field-group" style="flex:1;">
-                        <label for="g-new-grp-min">Mínimo</label>
-                        <input id="g-new-grp-min" type="number" min="0" max="10" value="0">
+                      <div class="g-field-group" style="flex:1.6;">
+                        <label for="g-new-grp-tipo">Regra de Escolha</label>
+                        <select id="g-new-grp-tipo" style="height:42px; border-radius:10px; border:1.5px solid #cbd5e1; padding:0 10px; font-weight:600; font-size:13px; background:#fff;">
+                          <option value="opcional_1">🟢 Opcional (até 1)</option>
+                          <option value="opcional_multi">🟢 Opcional (múltiplas)</option>
+                          <option value="obrig_1" selected>🔴 Obrigatório (escolha 1)</option>
+                          <option value="obrig_multi">🔴 Obrigatório (1 ou mais)</option>
+                        </select>
                       </div>
-                      <div class="g-field-group" style="flex:1;">
+                      <div class="g-field-group" id="g-wrap-grp-max" style="flex:1;">
                         <label for="g-new-grp-max">Máximo</label>
-                        <input id="g-new-grp-max" type="number" min="1" max="20" value="1">
+                        <input id="g-new-grp-max" type="number" min="1" max="20" value="1" style="height:42px;">
                       </div>
                     </div>
-                    <button type="button" class="btn-outline" id="g-btn-add-group" style="margin-top:10px; width:100%;">
+                    <button type="button" class="btn-outline" id="g-btn-add-group" style="margin-top:10px; width:100%; height:40px; font-weight:700;">
                       + Adicionar Grupo
                     </button>
                   </div>
@@ -1490,12 +1536,19 @@ export async function renderGestaoV2(app) {
             const isObrig = g.min >= 1;
 
             card.innerHTML = `
-              <div class="g-group-header">
-                <div class="g-group-title-row">
-                  <h4 class="g-group-title-txt">${esc(g.nome)}</h4>
-                  <span class="g-group-rule-badge" style="${isObrig ? 'background:#fee2e2; color:#b91c1c;' : ''}">
-                    ${isObrig ? `Obrigatório (mín ${g.min}, máx ${g.max})` : `Opcional (escolha até ${g.max})`}
-                  </span>
+              <div class="g-group-header" style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                <div class="g-group-title-row" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1;">
+                  <strong class="g-group-title-txt" style="font-size:15px; color:var(--navy);">${esc(g.nome)}</strong>
+                  <select class="g-group-rule-select" data-edit-grp-rule="${gIdx}" style="font-size:12px; font-weight:700; border-radius:6px; border:1px solid #cbd5e1; padding:3px 8px; cursor:pointer; background:${isObrig ? '#fee2e2; color:#b91c1c;' : '#dcfce7; color:#15803d;'}">
+                    <option value="obrig_1" ${isObrig && g.max === 1 ? 'selected' : ''}>🔴 Obrigatório (escolha 1)</option>
+                    <option value="obrig_multi" ${isObrig && g.max > 1 ? 'selected' : ''}>🔴 Obrigatório (escolha ${g.max})</option>
+                    <option value="opcional_1" ${!isObrig && g.max === 1 ? 'selected' : ''}>🟢 Opcional (até 1)</option>
+                    <option value="opcional_multi" ${!isObrig && g.max > 1 ? 'selected' : ''}>🟢 Opcional (até ${g.max})</option>
+                  </select>
+                  <label style="font-size:12px; color:#64748b; margin:0; display:inline-flex; align-items:center; gap:4px;">
+                    Máx:
+                    <input type="number" min="1" max="20" value="${g.max || 1}" data-edit-grp-max="${gIdx}" style="width:48px; height:28px; padding:2px 4px; font-size:12px; text-align:center; border:1px solid #cbd5e1; border-radius:6px;">
+                  </label>
                 </div>
                 <button type="button" class="btn-ghost" data-del-grp="${gIdx}" style="padding:4px 8px; font-size:12px; color:#ef4444;" title="Excluir grupo">
                   🗑️ Excluir
@@ -1528,6 +1581,27 @@ export async function renderGestaoV2(app) {
             const optPriceInput = card.querySelector(`[data-new-opt-price="${gIdx}"]`);
             if (optPriceInput) mascaraMoeda(optPriceInput);
 
+            // Handler de regra de escolha
+            const ruleSelect = card.querySelector(`[data-edit-grp-rule="${gIdx}"]`);
+            if (ruleSelect) {
+              ruleSelect.onchange = () => {
+                const val = ruleSelect.value;
+                if (val === 'obrig_1') { g.min = 1; g.max = 1; }
+                else if (val === 'obrig_multi') { g.min = 1; g.max = Math.max(2, g.max); }
+                else if (val === 'opcional_1') { g.min = 0; g.max = 1; }
+                else if (val === 'opcional_multi') { g.min = 0; g.max = Math.max(2, g.max); }
+                renderGroups();
+              };
+            }
+            const maxInp = card.querySelector(`[data-edit-grp-max="${gIdx}"]`);
+            if (maxInp) {
+              maxInp.onchange = () => {
+                g.max = Math.max(1, parseInt(maxInp.value, 10) || 1);
+                if (g.min > g.max) g.min = g.max;
+                renderGroups();
+              };
+            }
+
             // Handler para adicionar opção
             card.querySelector(`[data-add-opt="${gIdx}"]`).onclick = () => {
               const nameInp = card.querySelector(`[data-new-opt-name="${gIdx}"]`);
@@ -1536,7 +1610,7 @@ export async function renderGestaoV2(app) {
               if (!optNome) return;
               g.opcoes = g.opcoes || [];
               g.opcoes.push({
-                id: idParaSlug(optNome) + '-' + Math.random().toString(36).slice(2, 6),
+                id: 'opt_' + idParaSlug(optNome) + '_' + Math.random().toString(36).slice(2, 6),
                 nome: optNome,
                 precoCentavos: centavos,
                 ativo: true,
@@ -1574,51 +1648,51 @@ export async function renderGestaoV2(app) {
             const t = btn.dataset.template;
             if (t === 'ponto') {
               grupos.push({
-                id: 'grp-ponto-' + Math.random().toString(36).slice(2, 6),
+                id: 'grp_ponto_' + Math.random().toString(36).slice(2, 6),
                 nome: 'Ponto da Carne',
                 min: 1,
                 max: 1,
                 opcoes: [
-                  { id: 'opt-ao-ponto', nome: 'Ao ponto (rosado e suculento no centro)', precoCentavos: 0, ativo: true, maxQuantidade: 1 },
-                  { id: 'opt-bem-passado', nome: 'Bem passado', precoCentavos: 0, ativo: true, maxQuantidade: 1 },
-                  { id: 'opt-mal-passado', nome: 'Mal passado (centro bem vermelho)', precoCentavos: 0, ativo: true, maxQuantidade: 1 }
+                  { id: 'opt_ao_ponto', nome: 'Ao ponto (rosado e suculento no centro)', precoCentavos: 0, ativo: true, maxQuantidade: 1 },
+                  { id: 'opt_bem_passado', nome: 'Bem passado', precoCentavos: 0, ativo: true, maxQuantidade: 1 },
+                  { id: 'opt_mal_passado', nome: 'Mal passado (centro bem vermelho)', precoCentavos: 0, ativo: true, maxQuantidade: 1 }
                 ]
               });
             } else if (t === 'molhos') {
               grupos.push({
-                id: 'grp-molhos-' + Math.random().toString(36).slice(2, 6),
+                id: 'grp_molhos_' + Math.random().toString(36).slice(2, 6),
                 nome: 'Molhos da Casa',
                 min: 0,
                 max: 2,
                 opcoes: [
-                  { id: 'opt-maio-verde', nome: 'Maionese Verde Especial', precoCentavos: 0, ativo: true, maxQuantidade: 1 },
-                  { id: 'opt-barbecue', nome: 'Barbecue Defumado', precoCentavos: 0, ativo: true, maxQuantidade: 1 },
-                  { id: 'opt-molho-casa', nome: 'Molho da Casa Secreto', precoCentavos: 0, ativo: true, maxQuantidade: 1 }
+                  { id: 'opt_maio_verde', nome: 'Maionese Verde Especial', precoCentavos: 0, ativo: true, maxQuantidade: 1 },
+                  { id: 'opt_barbecue', nome: 'Barbecue Defumado', precoCentavos: 0, ativo: true, maxQuantidade: 1 },
+                  { id: 'opt_molho_casa', nome: 'Molho da Casa Secreto', precoCentavos: 0, ativo: true, maxQuantidade: 1 }
                 ]
               });
             } else if (t === 'adicionais') {
               grupos.push({
-                id: 'grp-adicionais-' + Math.random().toString(36).slice(2, 6),
+                id: 'grp_adicionais_' + Math.random().toString(36).slice(2, 6),
                 nome: 'Adicionais Extras',
                 min: 0,
                 max: 5,
                 opcoes: [
-                  { id: 'opt-bacon', nome: 'Bacon em Fatias Crocante', precoCentavos: 400, ativo: true, maxQuantidade: 2 },
-                  { id: 'opt-cheddar', nome: 'Cheddar Cremoso Extra', precoCentavos: 350, ativo: true, maxQuantidade: 2 },
-                  { id: 'opt-burger', nome: 'Hambúrguer 160g Extra', precoCentavos: 800, ativo: true, maxQuantidade: 2 },
-                  { id: 'opt-cebola', nome: 'Cebola Caramelizada', precoCentavos: 300, ativo: true, maxQuantidade: 1 }
+                  { id: 'opt_bacon', nome: 'Bacon em Fatias Crocante', precoCentavos: 400, ativo: true, maxQuantidade: 2 },
+                  { id: 'opt_cheddar', nome: 'Cheddar Cremoso Extra', precoCentavos: 350, ativo: true, maxQuantidade: 2 },
+                  { id: 'opt_burger', nome: 'Hambúrguer 160g Extra', precoCentavos: 800, ativo: true, maxQuantidade: 2 },
+                  { id: 'opt_cebola', nome: 'Cebola Caramelizada', precoCentavos: 300, ativo: true, maxQuantidade: 1 }
                 ]
               });
             } else if (t === 'queijo') {
               grupos.push({
-                id: 'grp-queijo-' + Math.random().toString(36).slice(2, 6),
+                id: 'grp_queijo_' + Math.random().toString(36).slice(2, 6),
                 nome: 'Escolha do Queijo',
                 min: 1,
                 max: 1,
                 opcoes: [
-                  { id: 'opt-q-cheddar', nome: 'Queijo Cheddar Inglês', precoCentavos: 0, ativo: true, maxQuantidade: 1 },
-                  { id: 'opt-q-prato', nome: 'Queijo Prato Especial', precoCentavos: 0, ativo: true, maxQuantidade: 1 },
-                  { id: 'opt-q-mussarela', nome: 'Queijo Muçarela Derretido', precoCentavos: 0, ativo: true, maxQuantidade: 1 }
+                  { id: 'opt_q_cheddar', nome: 'Queijo Cheddar Inglês', precoCentavos: 0, ativo: true, maxQuantidade: 1 },
+                  { id: 'opt_q_prato', nome: 'Queijo Prato Especial', precoCentavos: 0, ativo: true, maxQuantidade: 1 },
+                  { id: 'opt_q_mussarela', nome: 'Queijo Muçarela Derretido', precoCentavos: 0, ativo: true, maxQuantidade: 1 }
                 ]
               });
             }
@@ -1629,17 +1703,23 @@ export async function renderGestaoV2(app) {
         // Adicionar grupo personalizado
         addGroupBtn.onclick = () => {
           const nomeInp = modalWrap.querySelector('#g-new-grp-nome');
-          const minInp = modalWrap.querySelector('#g-new-grp-min');
+          const tipoSel = modalWrap.querySelector('#g-new-grp-tipo');
           const maxInp = modalWrap.querySelector('#g-new-grp-max');
           const gNome = nomeInp.value.trim();
           if (!gNome) return;
-          const minVal = Math.max(0, parseInt(minInp.value, 10) || 0);
           const maxVal = Math.max(1, parseInt(maxInp.value, 10) || 1);
+          let minVal = 0;
+          let finalMax = maxVal;
+          if (tipoSel.value === 'obrig_1') { minVal = 1; finalMax = 1; }
+          else if (tipoSel.value === 'obrig_multi') { minVal = 1; finalMax = Math.max(2, maxVal); }
+          else if (tipoSel.value === 'opcional_1') { minVal = 0; finalMax = 1; }
+          else if (tipoSel.value === 'opcional_multi') { minVal = 0; finalMax = Math.max(2, maxVal); }
+
           grupos.push({
-            id: 'grp-' + idParaSlug(gNome) + '-' + Math.random().toString(36).slice(2, 6),
+            id: 'grp_' + idParaSlug(gNome) + '_' + Math.random().toString(36).slice(2, 6),
             nome: gNome,
             min: minVal,
-            max: maxVal,
+            max: finalMax,
             opcoes: []
           });
           nomeInp.value = '';
@@ -1653,19 +1733,45 @@ export async function renderGestaoV2(app) {
           saveBtn.disabled = true;
           resultEl.textContent = 'Salvando opções e adicionais deste produto…';
           try {
+            const sanitizedGrupos = grupos.map(g => ({
+              id: String(g.id || 'grp_' + idParaSlug(g.nome) + '_' + Math.random().toString(36).slice(2, 6)).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80),
+              nome: String(g.nome || 'Opções').trim().slice(0, 80),
+              min: Math.max(0, Math.min(20, Math.round(Number(g.min) || 0))),
+              max: Math.max(1, Math.min(20, Math.round(Number(g.max) || 1))),
+              opcoes: (g.opcoes || []).map(o => ({
+                id: String(o.id || 'opt_' + idParaSlug(o.nome) + '_' + Math.random().toString(36).slice(2, 6)).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80),
+                nome: String(o.nome || 'Opção').trim().slice(0, 80),
+                precoCentavos: Math.max(0, Math.min(1000000, Math.round(Number(o.precoCentavos) || 0))),
+                ativo: o.ativo !== false,
+                maxQuantidade: Math.max(1, Math.min(10, Math.round(Number(o.maxQuantidade) || 1)))
+              }))
+            }));
+
+            let comboClean = undefined;
+            if (p.combo && p.combo.ativo) {
+              const rawPreco = p.combo.precoCentavos !== undefined ? Number(p.combo.precoCentavos) : (Number(p.combo.preco || 0) * (Number(p.combo.preco) < 100 ? 100 : 1));
+              comboClean = {
+                ativo: true,
+                precoCentavos: Math.round(rawPreco),
+                preco: Math.round(rawPreco),
+                fixos: Array.isArray(p.combo.fixos) ? p.combo.fixos : [],
+                bebidas: Array.isArray(p.combo.bebidas) ? p.combo.bebidas : []
+              };
+            }
+
             await s.call('salvarProdutoCardapioV2', {
               lojaId,
               versao: data.versao,
               produtoId: p.id,
               nome: p.nome,
               categoria: p.categoria || '',
-              descricao: p.descricao || '',
+              descricao: (p.descricao || '').replace(/[\r\n]+/g, ' ').trim(),
               imagemUrl: p.imagemUrl || '',
-              precoCentavos: p.precoCentavos,
-              ativo: p.ativo,
-              esgotado: p.esgotado,
-              ...(p.combo ? { combo: p.combo } : {}),
-              grupos
+              precoCentavos: Math.round(Number(p.precoCentavos) || 0),
+              ativo: p.ativo !== false,
+              esgotado: p.esgotado === true,
+              ...(comboClean ? { combo: comboClean } : {}),
+              grupos: sanitizedGrupos
             });
             uncertain = true;
             await load(false);
@@ -1673,7 +1779,7 @@ export async function renderGestaoV2(app) {
             say('Opções e adicionais do produto salvos com sucesso!', 'success');
             fechar();
           } catch (err) {
-            resultEl.textContent = 'Erro ao salvar: ' + (err.message || 'Tente novamente.');
+            resultEl.textContent = 'Erro ao salvar opções: ' + (err.message || 'Tente novamente.');
             saveBtn.disabled = false;
           } finally {
             busy = false;
