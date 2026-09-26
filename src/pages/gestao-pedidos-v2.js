@@ -29,9 +29,111 @@ function tocarCampainha() {
   } catch {}
 }
 
+export function imprimirComandaPedido(order, storeName = 'FlowPDV') {
+  let printArea = document.getElementById('g-print-ticket-area');
+  if (!printArea) {
+    printArea = document.createElement('div');
+    printArea.id = 'g-print-ticket-area';
+    document.body.append(printArea);
+  }
+
+  const canal = { mesa: 'MESA / SALÃO', retirada: 'RETIRADA NO BALCÃO', delivery: 'DELIVERY / ENTREGA' }[order.tipo] || (order.tipo || 'PEDIDO').toUpperCase();
+  const dateObj = order.criadoEm ? new Date(order.criadoEm) : new Date();
+  const dataFormatada = dateObj.toLocaleDateString('pt-BR');
+  const horaFormatada = dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  const clienteNome = order.contato?.nome || 'Consumidor';
+  const clienteTel = order.contato?.telefone || '';
+  const end = order.entrega?.endereco;
+
+  printArea.innerHTML = `
+    <div class="g-thermal-receipt">
+      <div class="g-tr-center g-tr-bold" style="font-size:16px;">${esc(storeName)}</div>
+      <div class="g-tr-center g-tr-bold" style="font-size:13px; margin:4px 0;">*** ${esc(canal)} ***</div>
+      <div class="g-tr-center" style="font-size:12px;">PEDIDO: #${esc(order.id.slice(0, 8).toUpperCase())}</div>
+      <div class="g-tr-center" style="font-size:11px;">Data: ${dataFormatada} às ${horaFormatada}</div>
+      ${order.mesaNome ? `<div class="g-tr-center g-tr-bold" style="font-size:14px; margin-top:3px;">${esc(order.mesaNome).toUpperCase()}</div>` : ''}
+
+      <div class="g-tr-line">--------------------------------</div>
+
+      <div class="g-tr-section">
+        <div><strong>CLIENTE:</strong> ${esc(clienteNome)}</div>
+        ${clienteTel ? `<div><strong>CONTATO:</strong> ${esc(clienteTel)}</div>` : ''}
+        ${end ? `
+          <div style="margin-top:3px;">
+            <strong>ENDEREÇO:</strong><br>
+            ${esc(end.logradouro || '')}, ${esc(end.numero || 'S/N')}<br>
+            ${end.complemento ? `Compl: ${esc(end.complemento)}<br>` : ''}
+            Bairro: ${esc(end.bairro || '')}<br>
+            ${end.referencia ? `Ref: ${esc(end.referencia)}<br>` : ''}
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="g-tr-line">--------------------------------</div>
+      <div class="g-tr-bold" style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <span>ITEM / QTD</span>
+        <span>VALOR</span>
+      </div>
+
+      <div class="g-tr-items">
+        ${order.itens.map(item => `
+          <div class="g-tr-item">
+            <div style="display:flex; justify-content:space-between; font-weight:700;">
+              <span>${item.quantidade}x ${esc(item.nome)}</span>
+              <span>${money(item.totalCentavos)}</span>
+            </div>
+            ${item.variante === 'combo' ? `<div class="g-tr-sub"> * COMBO INCLUSO</div>` : ''}
+            ${Array.isArray(item.opcoes) && item.opcoes.length ? item.opcoes.map(o => `
+              <div class="g-tr-sub"> + ${esc(o.nome)} ${o.precoCentavos ? `(${money(o.precoCentavos)})` : ''}</div>
+            `).join('') : ''}
+            ${item.observacao ? `
+              <div class="g-tr-obs"> OBS: "${esc(item.observacao)}"</div>
+            ` : ''}
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="g-tr-line">--------------------------------</div>
+
+      <div class="g-tr-totals">
+        ${order.taxaEntregaCentavos ? `
+          <div style="display:flex; justify-content:space-between;">
+            <span>Subtotal:</span>
+            <span>${money(order.subtotalCentavos || (order.totalCentavos - order.taxaEntregaCentavos))}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span>Taxa Entrega:</span>
+            <span>${money(order.taxaEntregaCentavos)}</span>
+          </div>
+        ` : ''}
+        <div style="display:flex; justify-content:space-between; font-size:15px; font-weight:800; margin-top:4px;">
+          <span>TOTAL:</span>
+          <span>${money(order.totalCentavos)}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:2px;">
+          <span>PAGAMENTO:</span>
+          <span>${esc(payments[order.pagamento] || order.pagamento).toUpperCase()}</span>
+        </div>
+      </div>
+
+      <div class="g-tr-line">================================</div>
+      <div class="g-tr-center" style="font-size:10px; margin-top:6px;">
+        FLOWPDV · SISTEMA DE GESTÃO<br>
+        Obrigado pela preferência!
+      </div>
+    </div>
+  `;
+
+  setTimeout(() => {
+    window.print();
+  }, 50);
+}
+
 export function renderPedidosGestao(host, options, valid) {
   const read = typeof options === 'function' ? options : options.read;
   const updateStatus = typeof options === 'object' ? options.updateStatus : null;
+  const storeName = typeof options === 'object' && options.storeName ? options.storeName : 'FlowPDV';
 
   host.innerHTML = `
     <header class="page-head">
@@ -43,6 +145,10 @@ export function renderPedidosGestao(host, options, valid) {
         <label class="g-audio-toggle" title="Tocar som quando chegar novo pedido">
           <input type="checkbox" id="g-sound-check" checked>
           <span>🔔 Alerta sonoro</span>
+        </label>
+        <label class="g-audio-toggle" title="Imprimir automaticamente ao aceitar pedido">
+          <input type="checkbox" id="g-autoprint-check">
+          <span>🖨️ Auto-imprimir</span>
         </label>
         <button type="button" class="btn-ghost g-orders-refresh" style="height:40px; padding:0 14px;">↻ Atualizar</button>
       </div>
@@ -344,6 +450,16 @@ export function renderPedidosGestao(host, options, valid) {
       };
       container.append(btnCancelar);
     }
+
+    // Botão de Impressão Térmica sempre acessível
+    const btnPrint = document.createElement('button');
+    btnPrint.type = 'button';
+    btnPrint.className = 'g-btn-order-step';
+    btnPrint.style.cssText = 'background:#f8fafc; color:#0f172a; border:1px solid #cbd5e1;';
+    btnPrint.innerHTML = '🖨️ Imprimir';
+    btnPrint.title = 'Imprimir comanda térmica do pedido';
+    btnPrint.onclick = () => imprimirComandaPedido(order, storeName);
+    container.append(btnPrint);
   }
 
   async function mudarStatus(order, novoStatus, btnTrigger, novoPagamento = null) {
@@ -357,6 +473,14 @@ export function renderPedidosGestao(host, options, valid) {
       if (novoPagamento) order.pagamento = novoPagamento;
       updateBadges();
       renderOrdersView();
+
+      // Auto-impressão se habilitada
+      if (novoStatus === 'em_preparo') {
+        const autoCheck = host.querySelector('#g-autoprint-check');
+        if (autoCheck?.checked) {
+          imprimirComandaPedido(order, storeName);
+        }
+      }
     } catch (err) {
       alert(err.message || 'Não foi possível alterar o status.');
       btnTrigger.disabled = false;

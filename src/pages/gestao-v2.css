@@ -2273,4 +2273,104 @@ body.g-modal-open {
   background: #fee2e2;
 }
 
+/* ==========================================================================
+   IMPRESSÃO TÉRMICA DE COMANDAS (58mm / 80mm)
+   ========================================================================== */
+
+#g-print-ticket-area {
+  display: none;
+}
+
+@media print {
+  /* Oculta interface e elementos da tela na impressão */
+  body * {
+    visibility: hidden;
+  }
+
+  #g-print-ticket-area,
+  #g-print-ticket-area * {
+    visibility: visible;
+  }
+
+  #g-print-ticket-area {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 76mm;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+    color: #000000;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  .g-thermal-receipt {
+    width: 100%;
+    padding: 2mm 1mm;
+    box-sizing: border-box;
+  }
+
+  .g-tr-center {
+    text-align: center;
+  }
+
+  .g-tr-bold {
+    font-weight: 700;
+  }
+
+  .g-tr-line {
+    text-align: center;
+    letter-spacing: -0.5px;
+    margin: 4px 0;
+    overflow: hidden;
+    white-space: nowrap;
+    font-weight: 700;
+  }
+
+  .g-tr-section {
+    margin: 6px 0;
+    font-size: 11.5px;
+    line-height: 1.3;
+  }
+
+  .g-tr-items {
+    margin: 6px 0;
+  }
+
+  .g-tr-item {
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed #666;
+  }
+
+  .g-tr-sub {
+    font-size: 11px;
+    padding-left: 8px;
+    color: #333;
+  }
+
+  .g-tr-obs {
+    font-size: 11px;
+    padding-left: 8px;
+    font-style: italic;
+    font-weight: 700;
+  }
+
+  .g-tr-totals {
+    margin: 6px 0;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  @page {
+    size: 80mm auto;
+    margin: 2mm;
+  }
+}
+
+
 
